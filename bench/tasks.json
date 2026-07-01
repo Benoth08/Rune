@@ -1,0 +1,21 @@
+[
+  {"id": "email", "task": "crée un module Python de validation d'email avec ses tests"},
+  {"id": "fibo", "task": "fais un code python qui calcule fibonacci avec une boucle for, avec ses tests"},
+  {"id": "loan", "task": "crée un module Python de calcul de mensualités de prêt (capital, taux annuel, durée) avec ses tests"},
+  {"id": "palindrome", "task": "crée un module Python qui détecte les palindromes (ignore casse et espaces) avec ses tests"},
+  {"id": "csvstats", "task": "crée un module Python qui parse un CSV (chaîne) et calcule moyenne/min/max d'une colonne numérique, avec ses tests"},
+  {"id": "romans", "task": "crée un module Python de conversion nombres romains vers entiers et inverse, avec ses tests"},
+  {"id": "slugify", "task": "crée un module Python slugify (accents, espaces, ponctuation) avec ses tests"},
+  {"id": "anagram", "task": "crée un module Python qui groupe des mots par anagrammes avec ses tests"},
+  {"id": "ipv4", "task": "crée un module Python de validation d'adresses IPv4 avec ses tests"},
+  {"id": "dates", "task": "crée un module Python qui calcule le nombre de jours ouvrés entre deux dates (sans jours fériés) avec ses tests"},
+  {"id": "stack", "task": "crée une classe Python Pile (push, pop, peek, is_empty, taille max avec exception) avec ses tests"},
+  {"id": "caesar", "task": "crée un module Python de chiffrement César (chiffre et déchiffre, préserve la casse) avec ses tests"},
+  {"id": "balanced", "task": "crée un module Python qui vérifie l'équilibrage des parenthèses/crochets/accolades avec ses tests"},
+  {"id": "wordfreq", "task": "crée un module Python qui compte la fréquence des mots d'un texte (top-N, insensible à la casse) avec ses tests", "kind": "code"},
+  {"id": "explain_gil", "task": "explique simplement ce qu'est le GIL en Python et ses conséquences pratiques", "kind": "general"},
+  {"id": "compare_db", "task": "compare les avantages et inconvénients de PostgreSQL et MongoDB pour une application web", "kind": "analyse"},
+  {"id": "redige_note", "task": "rédige une note de synthèse structurée sur les bonnes pratiques MLOps pour un déploiement de modèle en production", "kind": "redaction"},
+  {"id": "plan_migration", "task": "propose un plan d'action en étapes pour migrer une application monolithique vers une architecture microservices : risques, ordre des étapes, critères de validation à chaque palier", "kind": "general"},
+  {"id": "recherche_uv", "task": "explique ce qu'est le gestionnaire de paquets Python 'uv', en quoi il diffère de pip, et quand l'utiliser", "kind": "recherche"}
+]

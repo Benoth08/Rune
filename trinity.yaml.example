@@ -1,0 +1,46 @@
+# Trinity config — pool multi-modèles optionnel pour Rune
+# Désactivé par défaut. Passe à `enabled: true` pour activer.
+#
+# Trinity charge 3 modèles spécialisés en VRAM :
+# - Thinker : raisonnement pur (décomposition, chaîne de pensée)
+# - Worker : exécution (code, outils, génération)
+# - Critic : vérification des livrables
+#
+# Contrainte VRAM : 3 modèles simultanés. Sur 24 GB, utiliser NF4.
+# Sur 40+ GB, on peut passer quant_4bit: false (qualité meilleure).
+
+enabled: false
+
+thinker:
+  model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+  quant_4bit: true
+  max_new_tokens: 1024
+  temperature: 0.6
+  label: "Thinker (raisonnement pur)"
+  notes: "Distill R1 — excellent pour décomposer et raisonner"
+
+worker:
+  model_id: "Qwen/Qwen2.5-7B-Instruct"
+  quant_4bit: true
+  max_new_tokens: 512
+  temperature: 0.7
+  label: "Worker (exécution)"
+  notes: "Instruct standard — code, outils, génération"
+
+critic:
+  model_id: "Qwen/Qwen2.5-3B-Instruct"
+  quant_4bit: true
+  max_new_tokens: 256
+  temperature: 0.3
+  label: "Critic (vérification)"
+  notes: "Petit modèle rapide pour valider les livrables"
+
+routing:
+  # Thinker se déclenche si assess_complexity >= threshold_steps
+  thinker_threshold_steps: 4
+  # Thinker se déclenche si surprise >= threshold_surprise
+  thinker_threshold_surprise: 0.6
+  # Critic tourne toujours (true) ou seulement si doute élevé (false)
+  critic_always: true
+  # Critic se déclenche si doubt_index >= threshold (et critic_always=false)
+  critic_threshold_doubt: 0.4
