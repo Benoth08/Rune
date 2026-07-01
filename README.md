@@ -1,6 +1,6 @@
 # Rune
 
-> Agent IA cognitif **local**, **headless**, **open-weights only** — combine les **42 000 lignes** du cycle cognitif biomimétique de [Lythea](https://github.com/Benoth08/Lythea-Reasoning-Agent) avec les capacités agentiques d'[Rune](https://rune-agent.nousresearch.com/) (auto-skill, subagents, cron).
+> Agent IA cognitif **local**, **headless**, **open-weights only** — sous-module agentique de Taëlys (Lythea) qui ajoute auto-skill, subagents, cron, pool multi-modèles (Trinity) et cascade extérieure (Gemini/Claude).
 
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
@@ -12,39 +12,39 @@
 
 **Lythea v5.8** est un assistant LLM local avec un cycle cognitif biomimétique remarquable (encodage → surprise → retrieval → génération → consolidation), une mémoire multi-étages (SDM + MHN + KG + Chroma), du steering CAA, de la métacognition, du deep reasoning, du vision active, etc.
 
-**Rune** (Nous Research, 2026) est un agent autonome avec auto-skill (SKILL.md), subagents isolés, cron de fond.
+**Rune** est un sous-module agentique de Taëlys (Lythea). Il ajoute les capacités d'agent autonome : auto-skill (SKILL.md), subagents isolés, cron de fond, pool multi-modèles (Trinity), cascade extérieure (Gemini/Claude).
 
-**Rune** = Lythea (intégralement conservé) + extensions Rune :
+**Rune** = Lythea (intégralement conservé) + extensions agentiques :
 
-| Feature | Lythea v5.8 | Rune | **Rune** |
-|---|---|---|---|
-| Cycle cognitif biomimétique (5 phases) | ✅ | ❌ | ✅ |
-| Mémoire SDM + MHN + KG + Chroma | ✅ | ❌ | ✅ |
-| Steering CAA (hooks PyTorch) | ✅ | ❌ | ✅ |
-| Métacognition multi-signaux | ✅ (V4.4) | ❌ | ✅ |
-| Deep reasoning (chaîne 4 étapes) | ✅ | ❌ | ✅ |
-| Vision active (zoom cognitif VLM) | ✅ | ❌ | ✅ |
-| Cascade Gemini (draft-then-refine) | ✅ | ❌ | ✅ |
-| Web providers (Brave, DDG, SearXNG…) | ✅ | ❌ | ✅ |
-| Inhibition (3 niveaux) | ✅ | ❌ | ✅ |
-| Predictive coding (Friston) | ✅ | ❌ | ✅ |
-| Timeline + incohérence temporelle | ✅ | ❌ | ✅ |
-| Planning (PFC latéral) | ✅ | ❌ | ✅ |
-| Reflection + auto-calibration | ✅ | ❌ | ✅ |
-| CRAG (Corrective RAG) | ✅ | ❌ | ✅ |
-| GraphRAG (communities) | ✅ | ❌ | ✅ |
-| Consolidation microsleep/deep sleep | ✅ | ❌ | ✅ |
-| MCP support | ✅ | ❌ | ✅ |
-| Agent Taëlys (orchestrator + workers) | ✅ | ❌ | ✅ |
-| **AutoSkill (SKILL.md auto)** | ❌ (procédural passif) | ✅ | ✅ **+ métacognition filtre** |
-| **FailureMemory (anti-patterns)** | ❌ | ❌ | ✅ **unique** |
-| **SubAgent spawner (subprocess)** | ❌ (workers in-process) | ✅ | ✅ |
-| **Cron + consolidation post-run** | ❌ | ✅ (sans consolidation) | ✅ **+ microsleep** |
-| **TieredRetriever strict (5 niveaux)** | partiel | ✅ (3 niveaux) | ✅ |
-| **WorkingMemoryBuffer (Core 4±1)** | ❌ | ✅ | ✅ |
-| **Headless (CLI + API, pas d'UI)** | ❌ (UI lourde) | ✅ | ✅ |
-| **Speculative decoding** | ❌ | n/a | ✅ |
-| Modèles open-source + accès poids | ✅ | ❌ (API) | ✅ |
+| Feature | Lythea v5.8 | **Rune** |
+|---|---|---|
+| Cycle cognitif biomimétique (5 phases) | ✅ | ✅ |
+| Mémoire SDM + MHN + KG + Chroma | ✅ | ✅ |
+| Steering CAA (hooks PyTorch) | ✅ | ✅ |
+| Métacognition multi-signaux | ✅ (V4.4) | ✅ |
+| Deep reasoning (chaîne 4 étapes) | ✅ | ✅ |
+| Vision active (zoom cognitif VLM) | ✅ | ✅ |
+| Cascade Gemini (draft-then-refine) | ✅ | ✅ |
+| Web providers (Brave, DDG, SearXNG…) | ✅ | ✅ |
+| Inhibition (3 niveaux) | ✅ | ✅ |
+| Predictive coding (Friston) | ✅ | ✅ |
+| Timeline + incohérence temporelle | ✅ | ✅ |
+| Planning (PFC latéral) | ✅ | ✅ |
+| Reflection + auto-calibration | ✅ | ✅ |
+| CRAG (Corrective RAG) | ✅ | ✅ |
+| GraphRAG (communities) | ✅ | ✅ |
+| Consolidation microsleep/deep sleep | ✅ | ✅ |
+| MCP support | ✅ | ✅ |
+| Agent Taëlys (orchestrator + workers) | ✅ | ✅ |
+| **AutoSkill (SKILL.md auto)** | ❌ (procédural passif) | ✅ **+ métacognition filtre** |
+| **FailureMemory (anti-patterns)** | ❌ | ✅ **unique** |
+| **SubAgent spawner (subprocess)** | ❌ (workers in-process) | ✅ |
+| **Cron + consolidation post-run** | ❌ | ✅ **+ microsleep** |
+| **TieredRetriever strict (5 niveaux)** | partiel | ✅ |
+| **WorkingMemoryBuffer (Core 4±1)** | ❌ | ✅ |
+| **Headless (CLI + API, pas d'UI)** | ❌ (UI lourde) | ✅ |
+| **Speculative decoding** | ❌ | ✅ |
+| Modèles open-source + accès poids | ✅ | ✅ |
 
 ---
 
@@ -337,5 +337,5 @@ MIT — voir `LICENSE`.
 
 Inspiré de :
 - [Lythea](https://github.com/Benoth08/Lythea-Reasoning-Agent) v5.8 par Michaël Féré (42 000 lignes)
-- [Rune](https://rune-agent.nousresearch.com/) par Nous Research
+- Le concept d'agent autonome avec auto-skill, subagents et cron (inspiration générale)
 - [OpenClaw](https://openclaw.ai/) pour le concept omnicanal
