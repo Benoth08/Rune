@@ -234,12 +234,65 @@ class RuneCortex:
     # ── API utilitaire ────────────────────────────────────────────────
 
     def run_subagent(
-        self, task: str, context: str = "", timeout: float = 120.0
+        self,
+        task: str,
+        context: str = "",
+        timeout: float = 120.0,
+        use_hot_context: bool = True,
+        blackboard_path: str | None = None,
+        blackboard_section: str | None = None,
     ) -> dict:
-        """Lance un subagent isolé pour une tâche ponctuelle."""
+        """Lance un subagent isolé pour une tâche ponctuelle.
+
+        Parameters
+        ----------
+        task : str
+            Mission du sous-agent.
+        context : str
+            Contexte froid additionnel.
+        timeout : float
+            Timeout en secondes.
+        use_hot_context : bool
+            Si True (défaut), construit automatiquement un HotContext
+            à partir des mémoires du parent (RAG chunks + skills +
+            anti-patterns) et le passe au sous-agent. Désactive si False
+            (tests, mode dégradé).
+        blackboard_path : str | None
+            Chemin vers blackboard.json partagé. Si fourni, le sous-agent
+            lit les sections des autres agents + contract, et écrit dans
+            sa propre section.
+        blackboard_section : str | None
+            Nom de la section du blackboard pour ce sous-agent.
+        """
         if self.subagent_spawner is None:
             return {"status": "error", "error": "subagent disabled"}
-        result = self.subagent_spawner.run(task=task, context=context)
+
+        # ── Construit le HotContext (Solution A — mémoire partagée) ────
+        hot_context_dict: dict | None = None
+        if use_hot_context:
+            try:
+                from ..agents.hot_context import HotContextSerializer
+                serializer = HotContextSerializer(
+                    tiered_retriever=self.tiered_retriever,
+                    skills_store=self.skills,
+                    failures_store=self.failures,
+                    kg=getattr(self.hippocampe, "kg", None),
+                    embed_fn=self._embed_fn,
+                )
+                hot_context = serializer.build(task)
+                hot_context_dict = hot_context.as_dict()
+            except Exception as exc:
+                log.warning("Failed to build HotContext: %s", exc)
+                hot_context_dict = None
+
+        # ── Lance le sous-agent ────────────────────────────────────────
+        result = self.subagent_spawner.run(
+            task=task,
+            context=context,
+            hot_context=hot_context_dict,
+            blackboard_path=blackboard_path,
+            blackboard_section=blackboard_section,
+        )
         return result.as_dict()
 
     def add_cron_task(
@@ -432,3 +485,27 @@ class RuneCortex:
                 "Trinity Worker model_id '%s' configured for subagents",
                 worker_model_id,
             )
+
+    @property
+    def _embed_fn(self) -> Any:
+        """Fonction d'embedding pour le HotContextSerializer.
+
+        Utilise l'entity_extractor (GLiNER) de l'hippocampe si dispo.
+        Sinon retourne None (le HotContext sera limité aux skills/failures
+        sans similarity search).
+        """
+        try:
+            extractor = getattr(self.hippocampe, "entity_extractor", None)
+            if extractor is None:
+                return None
+            def _embed(text: str):
+                emb = extractor.encode(text)
+                if emb is None:
+                    return None
+                # torch.Tensor → list[float]
+                if hasattr(emb, "tolist"):
+                    return emb.tolist()
+                return list(emb)
+            return _embed
+        except Exception:
+            return None

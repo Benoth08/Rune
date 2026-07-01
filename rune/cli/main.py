@@ -235,6 +235,26 @@ def status():
     console.print_json(data=data)
 
 
+# ── Dashboard ─────────────────────────────────────────────────────────
+
+
+@app.command()
+def dashboard(
+    api: str = typer.Option("http://localhost:7860", "--api", help="URL API Rune"),
+    refresh: float = typer.Option(0.5, "--refresh", help="Intervalle refresh (s)"),
+):
+    """Dashboard ASCII live — affiche mission, subagents, mémoire, blackboard."""
+    from rune.cli.dashboard import run_dashboard
+    run_dashboard(api_url=api, refresh_sec=refresh, mock=False)
+
+
+@app.command()
+def demo_dashboard():
+    """Dashboard ASCII live avec données mockées (sans serveur)."""
+    from rune.cli.dashboard import run_dashboard
+    run_dashboard(mock=True)
+
+
 # ── Skills ────────────────────────────────────────────────────────────
 
 
@@ -282,6 +302,52 @@ def skills_archive(skill_id: str):
     skills, _, _ = _build_lightweight()
     skills.archive(skill_id)
     console.print(f"[green]Skill {skill_id} archivé[/]")
+
+
+@skills_app.command("compose")
+def skills_compose(
+    skill_ids: list[str] = typer.Argument(..., help="IDs des skills à composer (2 minimum)"),
+    strategy: str = typer.Option(
+        "sequential", "--strategy", "-s",
+        help="Stratégie : sequential | parallel | conditional | pipeline",
+    ),
+    trigger: str = typer.Option("", "--trigger", "-t", help="Trigger personnalisé"),
+    force: bool = typer.Option(False, "--force", help="Compose même si skills non fiables"),
+):
+    """Compose plusieurs skills en une nouvelle."""
+    skills, _, _ = _build_lightweight()
+    result = skills.compose(
+        skill_ids=skill_ids,
+        strategy=strategy,
+        composed_trigger=trigger or None,
+        force=force,
+    )
+    console.print_json(data=result)
+
+
+@skills_app.command("candidates")
+def skills_candidates(
+    max_pairs: int = typer.Option(5, "--max", "-n", help="Nombre max de paires"),
+):
+    """Trouve des paires de skills composables."""
+    skills, _, _ = _build_lightweight()
+    pairs = skills.find_composable_candidates(max_pairs=max_pairs)
+    if not pairs:
+        console.print("[dim]Aucune paire composable trouvée.[/]")
+        return
+
+    table = Table(title="Paires de skills composables")
+    table.add_column("Skill A", style="cyan")
+    table.add_column("Skill B", style="cyan")
+    table.add_column("Potential", justify="right", style="green")
+
+    for p in pairs:
+        table.add_row(
+            p["skill_a"]["id"][:20],
+            p["skill_b"]["id"][:20],
+            f"{p['potential']:.2f}",
+        )
+    console.print(table)
 
 
 # ── Cron ──────────────────────────────────────────────────────────────

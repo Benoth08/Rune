@@ -151,6 +151,9 @@ class SubAgentSpawner:
         context: str = "",
         payload: dict | None = None,
         model_id: str | None = None,
+        hot_context: dict | None = None,
+        blackboard_path: str | None = None,
+        blackboard_section: str | None = None,
     ) -> SubAgentResult:
         """Lance un subagent et attend le résultat.
 
@@ -162,12 +165,27 @@ class SubAgentSpawner:
             Contexte froid injecté (chunks RAG sélectionnés par le caller).
         payload : dict | None
             Override complet du payload envoyé au subagent. Si None,
-            construit à partir de task + context + model_id.
+            construit à partir de task + context + model_id + hot_context
+            + blackboard.
         model_id : str | None
             Model ID HuggingFace à charger dans le subprocess. Si fourni,
             override ``self._trinity_worker_model_id``. Le subprocess
             utilise ce modèle via HFModelWrapper. Si None et aucun
             model_id configuré, le subprocess tombe sur MockBackend.
+        hot_context : dict | None
+            Contexte mémoire chaud (Solution A). Contient les chunks RAG,
+            skills, anti-patterns pertinents pour la tâche. Sérialisé en
+            JSON et injecté dans le system prompt du sous-agent. Lecture
+            seule — le sous-agent ne peut pas écrire en mémoire.
+            Voir rune.agents.hot_context.HotContext.
+        blackboard_path : str | None
+            Chemin vers le fichier blackboard.json partagé (Solution B).
+            Si fourni, le sous-agent ouvre le blackboard, lit les sections
+            des autres agents + le contract, et écrit dans sa propre
+            section. Le parent re-load le blackboard au retour.
+        blackboard_section : str | None
+            Nom de la section du blackboard à utiliser pour ce sous-agent
+            (ex: "subagent_1"). Requis si blackboard_path est fourni.
         """
         start = time.time()
         result = SubAgentResult()
@@ -200,6 +218,14 @@ class SubAgentSpawner:
             # Injecte le model_id dans le payload (Trinity Option A)
             if effective_model_id and "model_id" not in payload:
                 payload["model_id"] = effective_model_id
+            # Injecte le hot_context (mémoire partagée, Solution A)
+            if hot_context and "hot_context" not in payload:
+                payload["hot_context"] = hot_context
+            # Injecte le blackboard (Solution B)
+            if blackboard_path and "blackboard_path" not in payload:
+                payload["blackboard_path"] = str(blackboard_path)
+                if blackboard_section:
+                    payload["blackboard_section"] = blackboard_section
             payload_json = json.dumps(payload)
 
             # Prépare l'env

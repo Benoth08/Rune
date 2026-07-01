@@ -120,6 +120,10 @@ class Skill:
     last_used_at: float = field(default_factory=time.time)
     source_episodes: list[str] = field(default_factory=list)
     archived: bool = False
+    # Rune — métadonnées de composition. Quand une skill est composée
+    # (voir SkillComposer), metadata.composed = True et source_skill_ids
+    # contient les IDs des skills sources.
+    metadata: dict = field(default_factory=dict)
 
     # ── Helpers ──────────────────────────────────────────────────────
 
@@ -313,14 +317,65 @@ class AutoSkillStore:
     def stats(self) -> dict:
         active = [s for s in self._skills.values() if not s.archived]
         archived = [s for s in self._skills.values() if s.archived]
+        composed = sum(1 for s in active if (s.metadata or {}).get("composed"))
         return {
             "total": len(self._skills),
             "active": len(active),
             "archived": len(archived),
             "reliable": sum(1 for s in active if s.is_reliable()),
+            "composed": composed,
             "max_active": MAX_ACTIVE_SKILLS,
             "max_total": MAX_TOTAL_SKILLS,
         }
+
+    # ── Composition (delegates to SkillComposer) ─────────────────────
+
+    def compose(
+        self,
+        skill_ids: list[str],
+        strategy: str = "sequential",
+        composed_trigger: str | None = None,
+        force: bool = False,
+        llm_callback: Any = None,
+    ) -> dict:
+        """Compose plusieurs skills en une nouvelle.
+
+        Voir rune.memory.skill_composer.SkillComposer pour les détails.
+        Retourne un dict (CompositionResult.as_dict()).
+        """
+        from .skill_composer import SkillComposer
+        composer = SkillComposer(self, llm_callback=llm_callback)
+        result = composer.compose(
+            skill_ids=skill_ids,
+            strategy=strategy,
+            composed_trigger=composed_trigger,
+            force=force,
+        )
+        return result.as_dict()
+
+    def find_composable_candidates(
+        self,
+        task_embedding: list[float] | None = None,
+        max_pairs: int = 5,
+    ) -> list[dict]:
+        """Trouve des paires de skills composables.
+
+        Retourne une liste de dicts :
+        [{"skill_a": {...}, "skill_b": {...}, "potential": 0.7}, ...]
+        """
+        from .skill_composer import SkillComposer
+        composer = SkillComposer(self)
+        pairs = composer.find_composable_candidates(
+            task_embedding=task_embedding, max_pairs=max_pairs
+        )
+        return [
+            {
+                "skill_a": {"id": a.skill_id, "trigger": a.trigger},
+                "skill_b": {"id": b.skill_id, "trigger": b.trigger},
+                "potential": round(pot, 3),
+            }
+            for a, b, pot in pairs
+        ]
 
     # ── Internes ──────────────────────────────────────────────────────
 
