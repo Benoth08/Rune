@@ -299,9 +299,18 @@ class SubAgentRuntime:
             # sampling profiles, etc.
             from ..model import HFModelWrapper
             wrapper = HFModelWrapper()
-            ok = wrapper.load(model_id)
-            if not ok:
-                raise RuntimeError(f"HFModelWrapper.load({model_id}) returned False")
+            # ATTENTION : HFModelWrapper.load() retourne None (pas un bool)
+            # et lève une exception en cas d'échec réel. On ne peut donc
+            # PAS tester `if not wrapper.load(...)` — ça vaudrait toujours
+            # True (not None) et ferait échouer un chargement réussi vers
+            # MockBackend. On appelle load(), puis on vérifie l'état réel
+            # via is_loaded.
+            wrapper.load(model_id)
+            if not getattr(wrapper, "is_loaded", False):
+                raise RuntimeError(
+                    f"HFModelWrapper.load({model_id}): modèle non chargé "
+                    f"après load() (is_loaded=False)"
+                )
 
             # Adapter HFModelWrapper vers l'interface ModelBackend
             return _HFModelWrapperAdapter(wrapper)
