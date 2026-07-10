@@ -50,18 +50,21 @@ def test_get_default_provider_returns_composite_by_default(monkeypatch):
 
 
 def test_get_default_provider_searxng_only_when_configured(monkeypatch):
+    monkeypatch.delenv("LYTHEA_WEB_PROVIDER", raising=False)
     monkeypatch.setenv("WEB_SEARCH_PROVIDER", "searxng")
     p = get_default_provider()
     assert isinstance(p, SearxngProvider)
 
 
 def test_get_default_provider_ddg_only_when_configured(monkeypatch):
+    monkeypatch.delenv("LYTHEA_WEB_PROVIDER", raising=False)
     monkeypatch.setenv("WEB_SEARCH_PROVIDER", "ddg")
     p = get_default_provider()
     assert isinstance(p, DdgProvider)
 
 
 def test_get_default_provider_unknown_falls_back_to_auto(monkeypatch):
+    monkeypatch.delenv("LYTHEA_WEB_PROVIDER", raising=False)
     monkeypatch.setenv("WEB_SEARCH_PROVIDER", "bogus")
     p = get_default_provider()
     assert isinstance(p, CompositeProvider)
@@ -481,6 +484,7 @@ def test_brave_skipped_when_unavailable_in_chain(monkeypatch):
 
 
 def test_provider_choice_brave(monkeypatch):
+    monkeypatch.delenv("LYTHEA_WEB_PROVIDER", raising=False)
     """WEB_SEARCH_PROVIDER=brave → only Brave is used."""
     monkeypatch.setenv("WEB_SEARCH_PROVIDER", "brave")
     monkeypatch.setenv("BRAVE_API_KEY", "fake-key")
@@ -764,6 +768,7 @@ def test_chain_skips_unavailable_providers(monkeypatch):
 
 
 def test_provider_choice_tavily(monkeypatch):
+    monkeypatch.delenv("LYTHEA_WEB_PROVIDER", raising=False)
     """WEB_SEARCH_PROVIDER=tavily → only Tavily."""
     monkeypatch.setenv("WEB_SEARCH_PROVIDER", "tavily")
     monkeypatch.setenv("TAVILY_API_KEY", "fake")
@@ -774,6 +779,7 @@ def test_provider_choice_tavily(monkeypatch):
 
 
 def test_provider_choice_serper(monkeypatch):
+    monkeypatch.delenv("LYTHEA_WEB_PROVIDER", raising=False)
     monkeypatch.setenv("WEB_SEARCH_PROVIDER", "serper")
     monkeypatch.setenv("SERPER_API_KEY", "fake")
     from rune.web_providers.factory import get_default_provider

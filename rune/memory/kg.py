@@ -157,12 +157,24 @@ class EntityExtractor:
     def _ensure_loaded(self) -> None:
         if self._model is not None:
             return
+        # Mémoïse l'échec : sans gliner installé, _model reste None et on
+        # retenterait (+ reloggerait) à CHAQUE appel — plusieurs fois par
+        # message. On ne tente qu'une fois, on logge une fois, puis on
+        # abandonne silencieusement (le KG se remplit alors moins, mais
+        # le pipeline continue).
+        if getattr(self, "_load_failed", False):
+            return
         try:
             from gliner import GLiNER
             self._model = GLiNER.from_pretrained(self._model_name)
             log.info("GLiNER loaded: %s", self._model_name)
         except Exception as exc:
-            log.warning("GLiNER load failed: %s", exc)
+            self._load_failed = True
+            log.warning(
+                "GLiNER indisponible (%s) — extraction d'entités désactivée "
+                "pour cette session. `pip install gliner` pour l'activer.",
+                type(exc).__name__,
+            )
 
     def extract(self, text: str) -> list[dict]:
         """Extract entities from text.

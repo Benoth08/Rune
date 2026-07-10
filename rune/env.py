@@ -107,6 +107,14 @@ def bootstrap_env() -> Path:
         "HF_HUB_DISABLE_TELEMETRY": "1",
         "TRANSFORMERS_VERBOSITY": "error",
         "TOKENIZERS_PARALLELISM": "false",
+        # Silence les barres de progression et avertissements bruyants
+        # qui polluent la CLI à chaque message (chargement paresseux des
+        # modèles auxiliaires : GLiNER, cross-encoder, ONNX Chroma…).
+        "HF_HUB_DISABLE_PROGRESS_BARS": "1",   # Fetching/Downloading/Reconstruction
+        "HF_HUB_VERBOSITY": "error",
+        "HF_HUB_DISABLE_XET": "0",
+        "SAFETENSORS_FAST_GPU": "1",
+        "TRANSFORMERS_NO_ADVISORY_WARNINGS": "1",
     }
     for key, val in defaults.items():
         os.environ.setdefault(key, val)

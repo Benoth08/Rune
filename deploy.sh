@@ -140,6 +140,18 @@ pip3 install $PIP_FLAGS --quiet \
 for spec in "transformers>=5.5.0" "accelerate>=0.30"; do
     pip3 install $PIP_FLAGS --no-deps --quiet "$spec" 2>&1 | grep -v "^WARNING\|^\[notice" || true
 done
+# GLiNER : extraction d'entités du Knowledge Graph. --no-deps STRICT
+# (sinon il retélécharge torch et écrase la build CUDA figée). Ses deps
+# non-torch (huggingface_hub, tokenizers, transformers) sont déjà posées
+# ci-dessus. Sans gliner, le KG ne se remplit pas et la CLI logge
+# "GLiNER indisponible" à répétition.
+pip3 install $PIP_FLAGS --no-deps --quiet gliner 2>&1 | grep -v "^WARNING\|^\[notice" || true
+if python3 -c "import gliner" 2>/dev/null; then
+    ok "gliner installé (extraction d'entités KG active)"
+else
+    warn "gliner non importable — le KG restera vide (non bloquant). Détail :"
+    python3 -c "import gliner" 2>&1 | sed 's/^/        /' | tail -3
+fi
 if python3 -c "import transformers" 2>/dev/null; then
     ok "transformers $(python3 -c 'import transformers;print(transformers.__version__)' 2>/dev/null) + cœur ML installés (run.py n'aura rien à faire au boot)"
 else

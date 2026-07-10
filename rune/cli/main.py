@@ -179,6 +179,30 @@ def chat(
         console.print("[yellow]--no-model : aucun modèle chargé, le chat ne "
                       "pourra pas répondre.[/]")
 
+    # ── Silence les barres de progression du chat ─────────────────────
+    # Le modèle principal est chargé (barre utile ci-dessus). À partir
+    # d'ici, les modèles auxiliaires (GLiNER, cross-encoder, ONNX Chroma)
+    # se chargent paresseusement à chaque message et polluent la console
+    # de barres « Loading weights / Fetching files ». On les coupe une
+    # fois le chat prêt : tqdm + HF hub silencieux, et on filtre le
+    # warning HF_TOKEN qui se répète.
+    import os as _os
+    import warnings as _warnings
+    _os.environ["TQDM_DISABLE"] = "1"
+    _os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+    try:
+        from huggingface_hub.utils import logging as _hf_logging
+        _hf_logging.set_verbosity_error()
+    except Exception:
+        pass
+    try:
+        import huggingface_hub as _hfh
+        _hfh.utils.disable_progress_bars()
+    except Exception:
+        pass
+    _warnings.filterwarnings("ignore", message=".*HF_TOKEN.*")
+    _warnings.filterwarnings("ignore", message=".*unauthenticated requests.*")
+
     console.print("[green]Prêt.[/] Tape /quit pour sortir.\n")
 
     def handler(msg):
