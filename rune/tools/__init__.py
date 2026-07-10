@@ -8,7 +8,7 @@ Each tool is a self-contained module with a clear interface :
 
 V5.1 ships with :
 - python_executor : run Python code in a sandboxed subprocess
-- (web is still handled by lythea.web — historical, will be
+- (web is still handled by rune.web — historical, will be
   migrated to a tool here in V5.2 for uniformity)
 
 Adding a new tool : create a module here, expose a ``run(args)``

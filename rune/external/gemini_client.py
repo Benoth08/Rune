@@ -2,7 +2,7 @@
 
 A small, dependency-light wrapper around the Gemini ``generateContent``
 REST endpoint, designed for the draft-then-refine cascade in
-:mod:`lythea.cognition.cascade`.
+:mod:`rune.cognition.cascade`.
 
 Design constraints
 ------------------
@@ -20,7 +20,7 @@ Design constraints
 
 4. **Network failures are recoverable.** Three retry attempts with
    exponential backoff. After that, the cascade falls back to the
-   local model (handled in :mod:`lythea.cognition.cascade`).
+   local model (handled in :mod:`rune.cognition.cascade`).
 
 5. **Synchronous interface.** Lythéa's cognition pipeline is sync.
    Async would force colored functions everywhere for marginal gain

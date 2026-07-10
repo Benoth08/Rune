@@ -21,7 +21,7 @@ info()  { echo -e "${BLUE}  →${NC} $1"; }
 
 echo ""
 echo "============================================================"
-echo "  Lythéa — Tests"
+echo "  Rune — Tests"
 echo "============================================================"
 echo ""
 
@@ -29,8 +29,8 @@ echo ""
 
 echo "1️⃣  Vérification syntaxe…"
 ERRORS=0
-for f in $(find lythea/ tests/ -name "*.py" -not -path "*/__pycache__/*"); do
-    if ! python3 -c "import ast; ast.parse(open('$f').read())" 2>/dev/null; then
+for f in $(find rune/ tests/ -name "*.py" -not -path "*/__pycache__/*"); do
+    if ! python3 -c "import ast; ast.parse(open('$f', encoding='utf-8').read())" 2>/dev/null; then
         err "$f"
         ERRORS=$((ERRORS + 1))
     fi
@@ -43,11 +43,7 @@ else
 fi
 
 if command -v node &> /dev/null; then
-    if node -c lythea/server/static/app.js 2>/dev/null; then
-        ok "JavaScript : OK"
-    else
-        warn "JavaScript app.js : erreur de syntaxe"
-    fi
+    : # JS check skipped — Rune est headless (pas de static/app.js)
 fi
 echo ""
 
@@ -60,16 +56,16 @@ import sys
 sys.path.insert(0, '.')
 errors = []
 for mod in [
-    'lythea.settings',
-    'lythea.boot',
-    'lythea.cache',
-    'lythea.temporal',
-    'lythea.microsleep',
-    'lythea.soft_memory',
-    'lythea.git_sync',
-    'lythea.sessions',
-    'lythea.server.auth',
-    'lythea.server.rate_limit',
+    'rune.settings',
+    'rune.boot',
+    'rune.cache',
+    'rune.temporal',
+    'rune.microsleep',
+    'rune.soft_memory',
+    'rune.git_sync',
+    'rune.sessions',
+    'rune.server.auth',
+    'rune.server.rate_limit',
 ]:
     try:
         __import__(mod)
@@ -216,8 +212,8 @@ echo "4️⃣  Statistiques…"
 # Count both top-level functions AND indented methods inside classes.
 # The previous grep missed all class-based tests (~70% of V3.9 tests).
 TOTAL_TESTS=$(grep -rhE "^(def test_|    def test_)" tests/*.py 2>/dev/null | wc -l)
-PY_FILES=$(find lythea/ -name "*.py" -not -path "*/__pycache__/*" | wc -l)
-PY_LINES=$(find lythea/ -name "*.py" -not -path "*/__pycache__/*" -exec cat {} + | wc -l)
+PY_FILES=$(find rune/ -name "*.py" -not -path "*/__pycache__/*" | wc -l)
+PY_LINES=$(find rune/ -name "*.py" -not -path "*/__pycache__/*" -exec cat {} + | wc -l)
 ok "Fichiers Python   : $PY_FILES"
 ok "Lignes de code    : $PY_LINES"
 ok "Tests définis     : $TOTAL_TESTS"
@@ -228,7 +224,7 @@ if [ $PYTEST_EXIT -eq 0 ]; then
     echo -e "  ${GREEN}✅ Validation réussie${NC}"
     echo "============================================================"
     echo ""
-    echo "Lythéa est prête à être lancée :"
+    echo "Rune est prêt à être lancée :"
     echo "  bash launch.sh        # avec tunnel Cloudflare"
     echo "  python3 run.py        # local seulement"
     echo ""

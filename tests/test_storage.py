@@ -1,4 +1,4 @@
-"""Unit tests for :class:`lythea.cognition.storage.StoragePhase`.
+"""Unit tests for :class:`rune.cognition.storage.StoragePhase`.
 
 Two write moments are exercised:
 

@@ -10,7 +10,7 @@ import re
 
 from rune.config import WEB_MAX_ROUNDS, WEB_STABILITY_THRESHOLD
 
-log = logging.getLogger("lythea.web")
+log = logging.getLogger("rune.web")
 
 # Temporal keywords that trigger web search (single words)
 TEMPORAL_KEYWORDS_SINGLE = {
@@ -560,7 +560,7 @@ class WebAgent:
 
     Provider selection
     ------------------
-    By default uses :func:`lythea.web_providers.get_default_provider`
+    By default uses :func:`rune.web_providers.get_default_provider`
     which returns a composite chain SearXNG → DDG (fallback). Override
     via env vars ``WEB_SEARCH_PROVIDER`` and ``SEARXNG_INSTANCE_URL``,
     or by passing a custom ``provider`` to the constructor.

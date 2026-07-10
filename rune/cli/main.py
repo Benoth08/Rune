@@ -28,6 +28,15 @@ import logging
 import sys
 from typing import Optional
 
+# Charge .env dans os.environ AVANT tout le reste. La CLI ne passe pas
+# par run.py (qui appelle bootstrap_env), donc sans ça les variables du
+# .env lues via os.getenv (ex: LYTHEA_WEB_PROVIDER pour le provider web,
+# les clés API Tavily/Serper) resteraient invisibles — mettre
+# LYTHEA_WEB_PROVIDER=auto dans .env n'aurait aucun effet en `rune chat`.
+from rune.env import bootstrap_env as _bootstrap_env
+
+_bootstrap_env()
+
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -52,13 +61,24 @@ def _build_rune():
 
     Cette fonction est lourde — elle instancie Hippocampe avec SDM, MHN,
     KG, Chroma, model, etc. À n'appeler qu'une fois par processus.
+
+    Important : LytheaApp.__init__ construit déjà un RuneCortex interne
+    et monkey-patche hippocampe.process_message. On réutilise ce RuneCortex
+    au lieu d'en créer un second (évite le double traitement AutoSkill /
+    FailureMemory par message, et la double boucle de consolidation).
     """
-    from rune.cortex_ext.integration import RuneCortex
     from rune.server.app import LytheaApp
 
-    # LytheaApp construit Hippocampe + tous les subsystems
     lythea_app = LytheaApp()
-    rune = RuneCortex(lythea_app.hippocampe)
+
+    # RuneCortex déjà construit et monkey-patché par LytheaApp.__init__
+    rune = lythea_app.rune_cortex
+    if rune is None:
+        # Fallback : RuneCortex n'a pas pu s'initialiser (import error).
+        # On en crée un minimal pour que le CLI reste utilisable.
+        from rune.cortex_ext.integration import RuneCortex
+        rune = RuneCortex(lythea_app.hippocampe)
+
     return rune, lythea_app
 
 
@@ -83,19 +103,92 @@ def _build_lightweight():
 
 
 @app.command()
-def chat():
-    """Mode interactif console — nécessite le boot complet."""
+def chat(
+    model: Optional[str] = typer.Option(
+        None, "--model", "-m",
+        help="Model ID HuggingFace à charger (ex: Qwen/Qwen2.5-7B-Instruct). "
+             "Défaut : RUNE_DEFAULT_MODEL, sinon LYTHEA_MODEL_ID, sinon le "
+             "modèle par défaut du catalogue.",
+    ),
+    no_model: bool = typer.Option(
+        False, "--no-model",
+        help="Ne charge aucun modèle (chat impossible, utile pour debug boot).",
+    ),
+    searxng: bool = typer.Option(
+        False, "--searxng",
+        help="Lance un SearXNG local pour une recherche web fiable "
+             "(clone + install au 1er run, ~1-2 min). Sans cette option, "
+             "un SearXNG local déjà lancé est détecté et utilisé "
+             "automatiquement ; sinon la recherche web retombe sur DDG.",
+    ),
+):
+    """Mode interactif console — nécessite le boot complet.
+
+    Charge automatiquement un modèle au démarrage (sauf --no-model), car
+    sans modèle en VRAM le chat renvoie « Aucun modèle chargé ».
+    """
+    import os
     from rune.channels.console import ConsoleChannel
     from rune.channels.base import OutgoingMessage
 
     console.print("[bold cyan]Rune[/] — boot en cours…", style="cyan")
-    rune, _ = _build_rune()
+
+    # ── Recherche web : détecte/lance un SearXNG local ────────────────
+    # Les instances SearXNG publiques sont rate-limitées par Google
+    # (« All SearXNG instances failed »). launch.sh lance un SearXNG
+    # local, mais pas rune chat — on reproduit ça ici. Sans --searxng,
+    # on se contente de détecter une instance déjà lancée ; avec, on la
+    # bootstrap. Dans tous les cas, s'il n'y en a pas, la chaîne web
+    # retombe sur DDG (mode auto).
+    from rune.env import ensure_local_searxng
+    _sx = ensure_local_searxng(autostart=searxng)
+    if _sx:
+        # Garde le mode composite (auto) : SearXNG d'abord, DDG en repli.
+        os.environ.setdefault("LYTHEA_WEB_PROVIDER", "auto")
+
+    rune, lythea_app = _build_rune()
+
+    # ── Chargement du modèle ──────────────────────────────────────────
+    # _build_rune() construit Hippocampe mais NE charge PAS de modèle
+    # (l'autoload du boot ne s'applique qu'au serveur). En CLI, on charge
+    # ici, sinon process_message échoue avec le code "no_model".
+    if not no_model:
+        from rune.config import DEFAULT_MODEL
+        model_id = (
+            model
+            or os.environ.get("RUNE_DEFAULT_MODEL")
+            or os.environ.get("LYTHEA_MODEL_ID")
+            or os.environ.get("LYTHEA_DEFAULT_MODEL")
+            or DEFAULT_MODEL
+        )
+        if lythea_app.model.is_loaded:
+            console.print(f"[green]Modèle déjà chargé : {lythea_app.model.model_id}[/]")
+        else:
+            console.print(f"[cyan]Chargement du modèle {model_id}…[/] "
+                          f"[dim](peut prendre 1-3 min au 1er lancement)[/]")
+            try:
+                lythea_app.model.load(model_id)
+                console.print(f"[green]Modèle chargé : {model_id}[/]")
+            except Exception as exc:
+                console.print(
+                    f"[red]Échec du chargement de {model_id} : {exc}[/]\n"
+                    f"[yellow]Le chat va démarrer mais ne pourra pas répondre. "
+                    f"Essaie un autre modèle avec [cyan]--model <id>[/].[/]"
+                )
+    else:
+        console.print("[yellow]--no-model : aucun modèle chargé, le chat ne "
+                      "pourra pas répondre.[/]")
+
     console.print("[green]Prêt.[/] Tape /quit pour sortir.\n")
 
     def handler(msg):
-        # process_message est un generator (SSE events) — on cumule
-        # les tokens partial + on récupère le texte final depuis done.
-        # Les events "error" non-fatals sont loggés mais n'interrompent
+        # process_message est un generator qui yield des events au format
+        # {"type": <type>, "data": {...}}. Les champs utiles sont DANS
+        # event["data"], pas à plat :
+        #   - partial : data["text"]        (token/chunk streamé)
+        #   - done    : data["final_text"]  (réponse complète)
+        #   - error   : data["message"]     (+ data["code"])
+        # Les events "error" non-fatals sont collectés mais n'interrompent
         # pas le flux (Lythea peut émettre des erreurs sur web search,
         # reasoning, etc. tout en continuant à générer).
         final_text = ""
@@ -103,30 +196,42 @@ def chat():
         errors = []
         for event in rune.process_message(msg.text, history=[]):
             event_type = event.get("type", "")
+            data = event.get("data", {})
+            if not isinstance(data, dict):
+                data = {}
             if event_type == "partial":
-                # Lythea stream les tokens via le champ "token" ou "text"
-                chunk = event.get("token") or event.get("text") or event.get("chunk", "")
+                # Le token streamé est dans data["text"]. Chaque partial
+                # porte le texte propre cumulé — on garde le dernier plutôt
+                # que de concaténer (sinon duplication).
+                chunk = data.get("text") or data.get("token") or data.get("chunk", "")
                 if chunk:
                     partial_chunks.append(chunk)
             elif event_type == "done":
-                # Le event done peut contenir le texte complet, ou pas
-                final_text = event.get("text") or event.get("content") or ""
+                # La réponse complète est dans data["final_text"].
+                final_text = data.get("final_text") or data.get("text") or ""
             elif event_type == "error":
-                # Logge mais n'interrompt pas — Lythea peut continuer après
+                # data["message"] + data["code"] (ex: "no_model").
                 err_msg = (
-                    event.get("message")
-                    or event.get("error")
-                    or event.get("detail")
-                    or event.get("reason")
+                    data.get("message")
+                    or data.get("error")
+                    or data.get("detail")
+                    or data.get("reason")
                     or str(event)
                 )
+                code = data.get("code")
+                if code:
+                    err_msg = f"{err_msg} [{code}]"
                 errors.append(err_msg)
-        # Si done n'avait pas le texte, on reconstruit depuis les partials
+        # Les partials portent le texte cumulé : le dernier est la réponse
+        # la plus complète. Si "done" n'a rien donné, on prend ce dernier
+        # partial plutôt que de tout concaténer (ce qui dupliquerait).
         if not final_text and partial_chunks:
-            final_text = "".join(partial_chunks)
+            final_text = partial_chunks[-1]
         if not final_text:
             if errors:
-                return OutgoingMessage(text=f"(pas de réponse — erreurs: {' | '.join(errors[:2])})")
+                return OutgoingMessage(
+                    text=f"(pas de réponse — erreurs: {' | '.join(errors[:2])})"
+                )
             return OutgoingMessage(text="(pas de réponse)")
         return OutgoingMessage(text=final_text)
 
@@ -139,16 +244,44 @@ def run(
     task: str = typer.Argument(..., help="La mission à exécuter"),
     context: str = typer.Option("", "--context", "-c", help="Contexte additionnel"),
     timeout: float = typer.Option(120.0, "--timeout", "-t", help="Timeout en secondes"),
+    model: Optional[str] = typer.Option(
+        None, "--model", "-m",
+        help="Model ID HuggingFace pour le subagent (ex: Qwen/Qwen2.5-7B-Instruct). "
+             "Défaut : RUNE_DEFAULT_MODEL / LYTHEA_MODEL_ID. En mode "
+             "--lightweight SANS modèle, le subagent utilise un MockBackend "
+             "(réponses génériques, ne calcule rien de réel).",
+    ),
     lightweight: bool = typer.Option(
         False, "--lightweight",
         help="Utilise le SubAgentSpawner standalone (sans boot Hippocampe)",
     ),
 ):
     """Exécute une mission ponctuelle via subagent."""
+    import os
+    # Résout le modèle : --model, sinon env. Sans modèle en --lightweight,
+    # le subagent tombe sur MockBackend (réponses templates, pas de vrai
+    # calcul) — c'est ce qui donne des réponses génériques du type "C'est
+    # une question intéressante…". On avertit clairement dans ce cas.
+    effective_model = (
+        model
+        or os.environ.get("RUNE_DEFAULT_MODEL")
+        or os.environ.get("LYTHEA_MODEL_ID")
+        or os.environ.get("LYTHEA_DEFAULT_MODEL")
+    )
     if lightweight:
         from rune.agents.subagent import SubAgentConfig, SubAgentSpawner
+        if not effective_model:
+            console.print(
+                "[yellow]⚠ Aucun modèle spécifié en mode --lightweight : "
+                "le subagent va utiliser un MockBackend (réponses génériques, "
+                "aucun calcul réel).[/]\n"
+                "[yellow]  Ajoute [cyan]--model Qwen/Qwen2.5-7B-Instruct[/] pour "
+                "un vrai modèle.[/]"
+            )
         spawner = SubAgentSpawner(SubAgentConfig(timeout_sec=timeout))
-        result = spawner.run(task=task, context=context)
+        result = spawner.run(
+            task=task, context=context, model_id=effective_model
+        )
         console.print_json(data=result.as_dict())
     else:
         console.print("[cyan]Boot Hippocampe…[/]")

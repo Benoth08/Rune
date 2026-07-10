@@ -7,7 +7,10 @@ exposes ``v4_status`` + ``v4_set_module`` matching the real contract.
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
-torch = pytest.importorskip("torch")  # routes.py imports lythea.model → torch
+try:
+    import torch
+except (ImportError, OSError):
+    pytest.skip("torch not available or broken CUDA", allow_module_level=True)  # routes.py imports rune.model → torch
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

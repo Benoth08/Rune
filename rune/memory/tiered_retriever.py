@@ -53,23 +53,23 @@ log = logging.getLogger("rune.memory.tiered")
 
 
 class SDMBackend(Protocol):
-    """Interface minimale attendue du SDM (cf. lythea.memory.sdm)."""
+    """Interface minimale attendue du SDM (cf. rune.memory.sdm)."""
     def read(self, address: list[float], top_k: int = ...) -> list[dict]: ...
 
 
 class MHNBackend(Protocol):
-    """Interface minimale attendue du MHN (cf. lythea.memory.mhn)."""
+    """Interface minimale attendue du MHN (cf. rune.memory.mhn)."""
     def recall(self, pattern: list[float], top_k: int = ...) -> list[dict]: ...
 
 
 class KGBackend(Protocol):
-    """Interface minimale attendue du KG (cf. lythea.memory.kg)."""
+    """Interface minimale attendue du KG (cf. rune.memory.kg)."""
     def query(self, entity: str) -> list[dict]: ...
     def search(self, query: str, top_k: int = ...) -> list[dict]: ...
 
 
 class ChromaBackend(Protocol):
-    """Interface minimale attendue de Chroma (cf. lythea.memory.retrieval)."""
+    """Interface minimale attendue de Chroma (cf. rune.memory.retrieval)."""
     def query(
         self, query_embeddings: list[list[float]], n_results: int = ...
     ) -> dict: ...

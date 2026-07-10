@@ -32,7 +32,7 @@ import urllib.request
 
 from rune.web_providers.base import SearchResult
 
-log = logging.getLogger("lythea.web_providers.searxng")
+log = logging.getLogger("rune.web_providers.searxng")
 
 
 # Curated public SearXNG instances. Selected for:

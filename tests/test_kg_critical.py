@@ -80,4 +80,5 @@ def test_catalog_has_coder_14b():
     spec = CATALOG.get("Qwen/Qwen2.5-Coder-14B-Instruct")
     assert spec is not None, "Coder-14B absent du catalogue"
     assert spec.quant_4bit is True
-    assert "Qwen/Qwen3-Coder-30B-A3B-Instruct" in CATALOG   # 30B toujours là
+    # Un second modèle Coder doit rester dans le catalogue (le 7B).
+    assert "Qwen/Qwen2.5-Coder-7B-Instruct" in CATALOG

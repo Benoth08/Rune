@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-log = logging.getLogger("lythea.cognition.semantic_router")
+log = logging.getLogger("rune.cognition.semantic_router")
 
 
 # ── Route definitions ──────────────────────────────────────────────────

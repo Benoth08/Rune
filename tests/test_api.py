@@ -83,12 +83,12 @@ def test_session_manager_crud():
         assert loaded.title == "Test Chat"
 
         # Add message
-        msg = Message(role="user", content="Hello Taëlys")
+        msg = Message(role="user", content="Hello Rune")
         sm.add_message(session.session_id, msg)
 
         loaded2 = sm.get(session.session_id)
         assert len(loaded2.messages) == 1
-        assert loaded2.messages[0].content == "Hello Taëlys"
+        assert loaded2.messages[0].content == "Hello Rune"
 
         # Update
         sm.update(session.session_id, title="Renamed", pinned=True)

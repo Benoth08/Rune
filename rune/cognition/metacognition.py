@@ -58,7 +58,7 @@ from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 
-log = logging.getLogger("lythea.cognition.metacognition")
+log = logging.getLogger("rune.cognition.metacognition")
 
 
 CONFIDENCE_LABELS = ("très_certaine", "certaine", "incertaine", "très_incertaine")

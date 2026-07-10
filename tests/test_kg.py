@@ -46,7 +46,7 @@ def test_add_relation():
     with tempfile.TemporaryDirectory() as tmp:
         kg = KnowledgeGraphStore(persist_dir=Path(tmp))
         e1 = kg.upsert_entity("Mika", "person", confidence=0.9)
-        e2 = kg.upsert_entity("Lythéa", "project", confidence=0.9)
+        e2 = kg.upsert_entity("Rune", "project", confidence=0.9)
         rid = kg.add_relation(e1, "works_on", e2, confidence=0.8)
         assert rid in kg.relations
 

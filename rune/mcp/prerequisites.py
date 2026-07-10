@@ -21,7 +21,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 
-log = logging.getLogger("lythea.mcp.prerequisites")
+log = logging.getLogger("rune.mcp.prerequisites")
 
 
 # Minimal Node version : MCP servers typically need 18+. We check

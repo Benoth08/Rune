@@ -13,7 +13,7 @@ import logging
 
 from rune.web_providers.base import SearchResult
 
-log = logging.getLogger("lythea.web_providers.ddg")
+log = logging.getLogger("rune.web_providers.ddg")
 
 
 class DdgProvider:

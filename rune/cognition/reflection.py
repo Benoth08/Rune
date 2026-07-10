@@ -60,7 +60,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Protocol
 
-log = logging.getLogger("lythea.cognition.reflection")
+log = logging.getLogger("rune.cognition.reflection")
 
 
 # ── Trigger detection ──────────────────────────────────────────────────

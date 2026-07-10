@@ -1,4 +1,4 @@
-"""Unit tests for :mod:`lythea.external.gemini_client`.
+"""Unit tests for :mod:`rune.external.gemini_client`.
 
 These tests use ``unittest.mock`` to stub out ``httpx.Client`` so we
 never make real network calls. Run normally in CI / on the pod —
@@ -182,7 +182,7 @@ class TestGeminiClientInit:
 
     def test_accepts_valid_key(self):
         client = GeminiClient(api_key=VALID_KEY)
-        assert client.model == "gemini-2.5-flash"
+        assert client.model == "gemini-3.5-flash"
 
     def test_custom_model(self):
         client = GeminiClient(api_key=VALID_KEY, model="gemini-2.5-flash-lite")
@@ -199,7 +199,7 @@ class TestGeminiClientInit:
 class TestRequestBody:
     def test_basic_user_message(self):
         body = GeminiClient._build_request_body(
-            system_prompt="You are Taëlys.",
+            system_prompt="You are Rune.",
             messages=[{"role": "user", "content": "Bonjour"}],
             max_tokens=500,
             temperature=0.6,
@@ -207,7 +207,7 @@ class TestRequestBody:
         assert body["contents"] == [
             {"role": "user", "parts": [{"text": "Bonjour"}]}
         ]
-        assert body["systemInstruction"]["parts"][0]["text"] == "You are Taëlys."
+        assert body["systemInstruction"]["parts"][0]["text"] == "You are Rune."
         assert body["generationConfig"]["temperature"] == 0.6
         assert body["generationConfig"]["maxOutputTokens"] == 500
 
@@ -317,10 +317,10 @@ class TestGenerate:
             status_code=200,
             json_body=_make_gemini_success_body("Bonjour Mika."),
         )
-        with patch("lythea.external.gemini_client.httpx.Client") as cli:
+        with patch("rune.external.gemini_client.httpx.Client") as cli:
             cli.return_value = _mock_httpx_client(success_resp)
             result = client.generate(
-                system_prompt="You are Taëlys.",
+                system_prompt="You are Rune.",
                 messages=[{"role": "user", "content": "Bonjour"}],
                 max_tokens=100,
                 temperature=0.7,
@@ -344,7 +344,7 @@ class TestGenerate:
             return success_resp
         cm.post.side_effect = fake_post
 
-        with patch("lythea.external.gemini_client.httpx.Client") as cli:
+        with patch("rune.external.gemini_client.httpx.Client") as cli:
             cli.return_value = cm
             client.generate(
                 system_prompt="",
@@ -352,7 +352,10 @@ class TestGenerate:
             )
 
         assert f"key={VALID_KEY}" in captured["url"]
-        assert "gemini-2.5-flash" in captured["url"]
+        # Le client construit l'URL avec DEFAULT_MODEL (gemini-3.5-flash
+        # depuis la mise à jour du catalogue Gemini). Voir DEFAULT_MODEL
+        # dans rune.external.gemini_client.
+        assert "gemini-3.5-flash" in captured["url"]
 
     def test_401_raises_unauthorized(self):
         client = GeminiClient(api_key=VALID_KEY)
@@ -360,7 +363,7 @@ class TestGenerate:
             status_code=401,
             json_body={"error": {"message": "API key invalid"}},
         )
-        with patch("lythea.external.gemini_client.httpx.Client") as cli:
+        with patch("rune.external.gemini_client.httpx.Client") as cli:
             cli.return_value = _mock_httpx_client(bad)
             with pytest.raises(GeminiUnauthorizedError):
                 client.generate(
@@ -374,7 +377,7 @@ class TestGenerate:
             status_code=403,
             json_body={"error": {"message": "permission denied"}},
         )
-        with patch("lythea.external.gemini_client.httpx.Client") as cli:
+        with patch("rune.external.gemini_client.httpx.Client") as cli:
             cli.return_value = _mock_httpx_client(bad)
             with pytest.raises(GeminiUnauthorizedError):
                 client.generate(
@@ -388,7 +391,7 @@ class TestGenerate:
             status_code=429,
             json_body={"error": {"message": "Quota exceeded"}},
         )
-        with patch("lythea.external.gemini_client.httpx.Client") as cli:
+        with patch("rune.external.gemini_client.httpx.Client") as cli:
             cli.return_value = _mock_httpx_client(bad)
             with pytest.raises(GeminiQuotaExceededError):
                 client.generate(
@@ -413,7 +416,7 @@ class TestGenerate:
             status_code=400,
             json_body={"error": {"message": "bad request"}},
         )
-        with patch("lythea.external.gemini_client.httpx.Client") as cli:
+        with patch("rune.external.gemini_client.httpx.Client") as cli:
             cli.return_value = _mock_httpx_client(bad)
             with pytest.raises(GeminiClientError, match="HTTP 400"):
                 client.generate(
@@ -436,7 +439,7 @@ class TestRetry:
                 200, json_body=_make_gemini_success_body("recovered")
             ),
         ]
-        with patch("lythea.external.gemini_client.httpx.Client") as cli:
+        with patch("rune.external.gemini_client.httpx.Client") as cli:
             cli.return_value = _mock_httpx_client(responses)
             result = client.generate(
                 system_prompt="",
@@ -449,7 +452,7 @@ class TestRetry:
             api_key=VALID_KEY, max_retries=1, backoff_base=0.001
         )
         bad = _make_response(503, json_body={"error": {"message": "down"}})
-        with patch("lythea.external.gemini_client.httpx.Client") as cli:
+        with patch("rune.external.gemini_client.httpx.Client") as cli:
             cli.return_value = _mock_httpx_client([bad, bad])
             with pytest.raises(GeminiTransientError):
                 client.generate(
@@ -463,7 +466,7 @@ class TestRetry:
         )
         bad = _make_response(401, json_body={"error": {"message": "no"}})
         cm = _mock_httpx_client(bad)
-        with patch("lythea.external.gemini_client.httpx.Client") as cli:
+        with patch("rune.external.gemini_client.httpx.Client") as cli:
             cli.return_value = cm
             with pytest.raises(GeminiUnauthorizedError):
                 client.generate(
@@ -488,7 +491,7 @@ class TestRetry:
             httpx.ConnectError("connection refused"),
             success_resp,
         ]
-        with patch("lythea.external.gemini_client.httpx.Client") as cli:
+        with patch("rune.external.gemini_client.httpx.Client") as cli:
             cli.return_value = cm
             result = client.generate(
                 system_prompt="",
@@ -587,7 +590,7 @@ class TestPerMinuteIntegratedInClient:
 
         # The next call should be blocked client-side without making
         # any network call.
-        with patch("lythea.external.gemini_client.httpx.Client") as cli:
+        with patch("rune.external.gemini_client.httpx.Client") as cli:
             with pytest.raises(GeminiQuotaExceededError, match="Per-minute"):
                 client.generate(
                     system_prompt="",

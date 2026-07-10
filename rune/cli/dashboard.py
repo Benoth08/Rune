@@ -316,81 +316,167 @@ def build_layout(status: dict[str, Any]) -> Layout:
 # ── Status fetcher ───────────────────────────────────────────────────
 
 
-def fetch_status(api_url: str, timeout: float = 2.0) -> dict[str, Any]:
-    """Récupère le status depuis l'API REST de Rune.
+def fetch_status(
+    api_url: str = "http://localhost:7860",
+    timeout: float = 2.0,
+    data_dir: str = "data",
+) -> dict[str, Any]:
+    """Récupère le status depuis l'API Lythea + lit les fichiers Rune.
 
-    Endpoints interrogés :
-    - GET /v1/health → backend + model_loaded
-    - GET /v1/status → cognitive_loop, skills, failures, consolidation, cron
-    - GET /v1/skills → liste des skills
-    - GET /api/boot/status → boot status
-    - GET /api/memory/status → compteurs SDM/MHN/KG/Chroma
+    Sources :
+    - API Lythea : /api/health, /api/boot/status, /api/memory/status
+    - Fichiers Rune : data/skills/skills.json, data/failures/failures.json,
+      data/cron/tasks.json
 
-    Si l'API est down, retourne un dict avec error.
+    Si l'API est down, on garde quand même les données fichiers.
     """
+    import json
+    from pathlib import Path
+
     status: dict[str, Any] = {"error": None}
 
+    # ── API Lythea ──────────────────────────────────────────────────
     try:
         with httpx.Client(timeout=timeout) as client:
             # Healthcheck
             try:
-                r = client.get(f"{api_url}/v1/health")
+                r = client.get(f"{api_url}/api/health")
                 if r.status_code == 200:
                     health = r.json()
                     status["backend"] = health.get("backend", "?")
                     status["model_loaded"] = health.get("model_loaded", False)
+                    status["vram_free_gb"] = health.get("vram_free_gb", 0)
+                    status["model_id"] = health.get("model_id")
                 else:
-                    status["error"] = f"HTTP {r.status_code} on /v1/health"
+                    status["error"] = f"HTTP {r.status_code} on /api/health"
             except Exception as exc:
-                status["error"] = f"health: {exc}"
-                return status
+                # Erreur de connexion typique : le serveur n'est pas
+                # lancé. "Cannot assign requested address" (Errno 99) est
+                # cryptique — on ajoute l'action attendue.
+                msg = str(exc)
+                if "Cannot assign requested address" in msg or "Connection refused" in msg:
+                    status["error"] = (
+                        f"Serveur injoignable sur {api_url} — lance "
+                        f"'rune serve' dans un autre terminal, ou passe "
+                        f"--api <url> si le serveur tourne ailleurs."
+                    )
+                else:
+                    status["error"] = f"API down: {msg}"
 
-            # Status global (Rune extensions)
-            try:
-                r = client.get(f"{api_url}/v1/status")
-                if r.status_code == 200:
-                    data = r.json()
-                    status["trinity"] = data.get("trinity", {})
-                    status["skills"] = data.get("skills", {})
-                    status["failures"] = data.get("failures", {})
-                    status["consolidation"] = data.get("consolidation", {})
-                    status["cron"] = data.get("cron", {})
-            except Exception:
-                pass
-
-            # Skills list
-            try:
-                r = client.get(f"{api_url}/v1/skills")
-                if r.status_code == 200:
-                    data = r.json()
-                    status["skills"] = data.get("skills", [])
-            except Exception:
-                pass
-
-            # Mémoire Lythea
-            try:
-                r = client.get(f"{api_url}/api/memory/status")
-                if r.status_code == 200:
-                    status["memory"] = r.json()
-            except Exception:
-                pass
-
-            # Boot status (pour Trinity)
+            # Boot status
             try:
                 r = client.get(f"{api_url}/api/boot/status")
                 if r.status_code == 200:
                     boot = r.json()
-                    if "trinity" not in status:
-                        status["trinity"] = {
-                            "enabled": boot.get("components", {}).get("trinity") == "ok",
-                        }
+                    components = boot.get("components", {})
+                    status["trinity"] = {
+                        "enabled": components.get("trinity") == "ok",
+                    }
+                    status["boot_components"] = components
+            except Exception:
+                pass
+
+            # Mémoire Lythea (SDM/MHN/KG/Chroma)
+            # L'API retourne des dicts imbriqués :
+            #   {"sdm": {"active_rows": N, ...}, "mhn": {"stored": N, ...}, ...}
+            # On normalise en clés plates pour render_memory().
+            try:
+                r = client.get(f"{api_url}/api/memory/status")
+                if r.status_code == 200:
+                    raw = r.json()
+                    status["memory"] = {
+                        "sdm_count": raw.get("sdm", {}).get("active_rows", "?"),
+                        "mhn_count": raw.get("mhn", {}).get("stored", "?"),
+                        "kg_entities": raw.get("kg", {}).get("entities", "?"),
+                        "chroma_count": raw.get("chroma", {}).get("count", "?"),
+                        # skills_count et failures_count injectés depuis
+                        # les fichiers JSON Rune ci-dessous
+                        "skills_count": 0,
+                        "failures_count": 0,
+                    }
             except Exception:
                 pass
 
     except Exception as exc:
         status["error"] = str(exc)
 
+    # ── Fichiers Rune (skills, failures, cron) ──────────────────────
+    # Ces données ne sont pas dans l'API Lythea — on lit directement
+    # les fichiers JSON persistés par RuneCortex.
+    data_path = Path(data_dir)
+
+    # Skills
+    try:
+        skills_file = data_path / "skills" / "skills.json"
+        if skills_file.exists():
+            with skills_file.open() as f:
+                skills_data = json.load(f)
+            skills_list = skills_data.get("skills", [])
+            # Format pour le dashboard
+            status["skills"] = [
+                {
+                    "id": s.get("skill_id", "?"),
+                    "trigger": s.get("trigger", "?"),
+                    "success_count": s.get("success_count", 0),
+                    "confidence": s.get("confidence", 0),
+                    "is_reliable": _is_skill_reliable(s),
+                }
+                for s in skills_list
+                if not s.get("archived", False)
+            ]
+        else:
+            status["skills"] = []
+    except Exception:
+        status["skills"] = []
+
+    # Failures
+    try:
+        failures_file = data_path / "failures" / "failures.json"
+        if failures_file.exists():
+            with failures_file.open() as f:
+                failures_data = json.load(f)
+            status["failures_count"] = len(failures_data.get("failures", []))
+        else:
+            status["failures_count"] = 0
+    except Exception:
+        status["failures_count"] = 0
+
+    # Injecte skills_count et failures_count dans le dict mémoire
+    # (render_memory() lit depuis status["memory"], pas depuis status["skills"])
+    if "memory" not in status:
+        status["memory"] = {}
+    status["memory"]["skills_count"] = len(status.get("skills", []))
+    status["memory"]["failures_count"] = status.get("failures_count", 0)
+
+    # Cron tasks
+    try:
+        cron_file = data_path / "cron" / "tasks.json"
+        if cron_file.exists():
+            with cron_file.open() as f:
+                cron_data = json.load(f)
+            status["cron"] = {
+                "running": False,
+                "task_count": len(cron_data.get("tasks", [])),
+                "enabled_count": sum(
+                    1 for t in cron_data.get("tasks", []) if t.get("enabled", True)
+                ),
+            }
+        else:
+            status["cron"] = {"running": False, "task_count": 0, "enabled_count": 0}
+    except Exception:
+        status["cron"] = {"running": False, "task_count": 0}
+
     return status
+
+
+def _is_skill_reliable(skill: dict) -> bool:
+    """Reproduit Skill.is_reliable() depuis un dict."""
+    total = skill.get("success_count", 0) + skill.get("failure_count", 0)
+    if total < 2:
+        return False
+    if skill.get("failure_count", 0) / total > 0.3:
+        return False
+    return True
 
 
 def get_mock_status() -> dict[str, Any]:
@@ -462,6 +548,7 @@ def run_dashboard(
     api_url: str = "http://localhost:7860",
     refresh_sec: float = 0.5,
     mock: bool = False,
+    data_dir: str = "data",
 ) -> None:
     """Lance le dashboard ASCII live.
 
@@ -473,6 +560,9 @@ def run_dashboard(
         Intervalle de refresh en secondes (défaut 0.5s).
     mock : bool
         Si True, utilise des données mockées (pour démo sans serveur).
+    data_dir : str
+        Chemin vers le dossier data/ de Rune (pour lire skills.json,
+        failures.json, cron/tasks.json directement).
     """
     print("\n  Démarrage du dashboard Rune...\n", file=sys.stderr)
     time.sleep(0.3)
@@ -487,7 +577,7 @@ def run_dashboard(
                 if mock:
                     status = get_mock_status()
                 else:
-                    status = fetch_status(api_url)
+                    status = fetch_status(api_url, data_dir=data_dir)
 
                 if status.get("error"):
                     # Affiche l'erreur dans le panel header

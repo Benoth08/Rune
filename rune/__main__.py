@@ -1,4 +1,4 @@
-"""Entry point for ``python -m lythea``."""
+"""Entry point for ``python -m rune`` (lance le serveur HTTP)."""
 from __future__ import annotations
 
 from rune.env import bootstrap_env  # noqa: F401 — must run first
@@ -10,7 +10,7 @@ from rune.logging_setup import configure_logging
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Lythéa V3 — Rune")
+    parser = argparse.ArgumentParser(description="Rune — serveur HTTP")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--log-level", default="INFO")

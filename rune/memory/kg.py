@@ -70,7 +70,7 @@ from rune.config import (
     SENSITIVE_ENTITY_TYPES,
 )
 
-log = logging.getLogger("lythea.memory.kg")
+log = logging.getLogger("rune.memory.kg")
 
 
 def merge_entity_passes(passes: list, capture_sensitive: bool = True) -> list[dict]:

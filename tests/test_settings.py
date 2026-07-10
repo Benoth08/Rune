@@ -44,7 +44,7 @@ def test_post_refactor_calibration_defaults():
     you are intentionally changing one of these defaults, also update
     CHANGELOG.md and the comments in settings.py explaining why.
 
-    See the comments in :mod:`lythea.settings` for the full calibration
+    See the comments in :mod:`rune.settings` for the full calibration
     history and reasoning behind each value.
     """
     s = _reload_settings()
@@ -163,10 +163,10 @@ def test_config_module_reexports():
     assert config.DEFAULT_MODEL == "Qwen/Qwen2.5-3B-Instruct"
     assert "person" in config.GLINER_LABELS
     # V5 refondu : le SYSTEM_PROMPT commence maintenant par une section
-    # markdown "# Identité" plutôt que directement "Tu es Taëlys". On
+    # markdown "# Identité" plutôt que directement "Tu es Rune". On
     # vérifie la présence de l'identité dans les 100 premiers caractères.
-    assert "Tu es Taëlys" in config.SYSTEM_PROMPT[:200], (
-        "L'identité Taëlys doit apparaître tôt dans le SYSTEM_PROMPT"
+    assert "Tu es Rune" in config.SYSTEM_PROMPT[:200], (
+        "L'identité Rune doit apparaître tôt dans le SYSTEM_PROMPT"
     )
     assert "qwen2vl" in config.CAPTIONER_OPTIONS
 

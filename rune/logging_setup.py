@@ -105,7 +105,7 @@ def build_uvicorn_log_config() -> dict:
         "disable_existing_loggers": False,
         "filters": {
             "polling": {
-                "()": "lythea.logging_setup._PollingAccessFilter",
+                "()": "rune.logging_setup._PollingAccessFilter",
             },
         },
         "formatters": {

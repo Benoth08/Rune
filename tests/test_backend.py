@@ -118,7 +118,7 @@ def test_get_backend_returns_mock_when_forced():
 
 def test_get_backend_auto_falls_back_to_mock(monkeypatch):
     """Sans CUDA, get_backend auto-detect retourne MockBackend."""
-    monkeypatch.setenv("HERMES_LYTHEA_BACKEND", "mock")
+    monkeypatch.setenv("RUNE_BACKEND", "mock")
     backend = get_backend()
     assert backend.name == "mock"
 

@@ -1,7 +1,7 @@
 """Static configuration: paths, device, model catalogue, prompts.
 
 Tunable runtime parameters (dimensions, thresholds, intervals…) live in
-:mod:`lythea.settings` and are environment-overridable. We re-export them
+:mod:`rune.settings` and are environment-overridable. We re-export them
 from this module for backward compatibility — existing imports like
 ``from rune.config import SDM_DIM`` continue to work.
 """
@@ -531,6 +531,13 @@ MAX_HISTORY_TURNS = _settings.max_history_turns
 KG_ACTIVE_THRESHOLD = _settings.kg_active_threshold
 KG_PENDING_TTL_HOURS = _settings.kg_pending_ttl_hours
 KG_FUZZY_THRESHOLD = _settings.kg_fuzzy_threshold
+
+# Rétention Chroma (V5.9) — durée de vie des chunks 'exchange' non
+# consultés. Passé ce délai sans accès (last_access_ts), un souvenir
+# épisodique 'exchange' est purgé par _retention_gc() au deep_sleep.
+# Les 'consolidated' (promus par le micro-sleep) sont épargnés : ils ont
+# un type différent, hors du champ du GC. getattr pour override par .env.
+RETENTION_TTL_DAYS = getattr(_settings, "retention_ttl_days", 30)
 
 # Retrieval
 RETRIEVAL_TOP_N = _settings.retrieval_top_n

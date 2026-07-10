@@ -4,7 +4,7 @@ Deux modes :
 1. INTÉGRÉ : démarre automatiquement avec le serveur web quand un token est
    configuré (``telegram_bot_token`` dans les réglages ou env
    ``LYTHEA_TELEGRAM_TOKEN``). Le navigateur n'est plus nécessaire.
-2. STANDALONE (« sans le framework ») : ``python -m lythea.telegram_bot
+2. STANDALONE (« sans le framework ») : ``python -m rune.telegram_bot
    [--model <id>]`` boote le cœur cognitif (LytheaApp + préchargement) SANS
    uvicorn ni interface web — Telegram devient la seule interface.
 
@@ -24,7 +24,7 @@ import time
 import urllib.parse
 import urllib.request
 
-log = logging.getLogger("lythea.telegram")
+log = logging.getLogger("rune.telegram")
 
 _API = "https://api.telegram.org/bot{token}/{method}"
 _HISTORY_MAX = 24          # tours conservés par chat (continuité de session)

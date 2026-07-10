@@ -92,6 +92,16 @@ class RuneCortex:
         self.skill_extractor = SkillExtractor()
         self.failure_analyzer = FailureAnalyzer()
 
+        # ── Jugement LLM pour l'extraction de skills ──────────────────
+        # Sans callback, SkillExtractor tombe sur l'heuristique naïve
+        # (premières phrases de la réponse = « approche »), qui produit
+        # des skills grossiers. On branche ici le modèle déjà chargé
+        # comme juge : il décide si l'échange mérite un skill et, si oui,
+        # en extrait un pattern structuré. Le prompt gère lui-même le
+        # cas « trop trivial » via {"skip": true}. C'est le second rideau
+        # après le filtre heuristique _looks_conversational().
+        self.skill_extractor.set_llm_callback(self._llm_skill_judge)
+
         # SubAgent spawner (désactivable pour tests)
         self.subagent_spawner: SubAgentSpawner | None = (
             SubAgentSpawner(SubAgentConfig()) if enable_subagent else None
@@ -137,9 +147,14 @@ class RuneCortex:
         self,
         message: str,
         history: list[dict] | None = None,
+        *args: Any,
         **kwargs: Any,
     ) -> Any:
         """Wrap Hippocampe.process_message avec les hooks Rune.
+
+        Signature compatible avec Lythea : accepte les args positionnels
+        supplémentaires (images, cancelled, last_message_ts, ...) et les
+        passe tels quels à l'hippocampe sous-jacent.
 
         Avant : injecte WorkingMemoryBuffer + skills + anti-patterns.
         Après : analyse succès/échec et met à jour AutoSkill/FailureMemory.
@@ -183,12 +198,23 @@ class RuneCortex:
             relevance=1.0,
         ))
 
-        # ── Délègue à Hippocampe ───────────────────────────────────────
-        gen = self.hippocampe.process_message(
-            message=message,
-            history=history,
-            **kwargs,
-        )
+        # ── Délègue à Hippocampe (version originale, pas le wrapper) ───
+        # Important : self.hippocampe.process_message est maintenant le
+        # wrapper (RuneCortex.process_message). Si on l'appelle, on crée
+        # une récursion infinie. On doit appeler l'original stocké dans
+        # _original_process (par server/app.py lors du monkey-patch).
+        original_process = getattr(self, "_original_process", None)
+        if original_process is not None:
+            # Appelle l'original avec tous les args positionnels + kwargs
+            gen = original_process(message, history, *args, **kwargs)
+        else:
+            # Fallback : pas de monkey-patch (CLI mode, pas API)
+            gen = self.hippocampe.process_message(
+                message=message,
+                history=history,
+                *args,
+                **kwargs,
+            )
 
         final_text = ""
         final_doubt = 0.5
@@ -201,17 +227,44 @@ class RuneCortex:
                 event = next(gen)
                 event_type = event.get("type", "")
                 if event_type == "done":
-                    final_text = event.get("text", "")
-                    final_doubt = event.get("doubt_index", 0.5)
-                    final_confidence_label = event.get(
-                        "confidence_label", "certaine"
+                    # Les champs sont normalement DANS event["data"]
+                    # (format réel de hippocampe.process_message). On lit
+                    # data en priorité, avec repli sur le niveau racine pour
+                    # rester compatible avec d'éventuels producteurs à plat.
+                    # Le texte final est data["final_text"] (pas "text").
+                    # Sans ça, final_text restait vide et l'AutoSkill
+                    # extraction ne se déclenchait jamais (bug historique).
+                    d = event.get("data")
+                    if not isinstance(d, dict):
+                        d = event  # repli : champs à plat sur l'event
+                    final_text = (
+                        d.get("final_text")
+                        or d.get("text")
+                        or event.get("final_text")
+                        or event.get("text", "")
                     )
-                    web_used = event.get("web_used", False)
-                    kg_hits = event.get("kg_facts_count", 0)
+                    final_doubt = d.get(
+                        "doubt_index", event.get("doubt_index", 0.5)
+                    )
+                    final_confidence_label = d.get(
+                        "confidence_label",
+                        event.get("confidence_label", "certaine"),
+                    )
+                    web_used = d.get("web_used", event.get("web_used", False))
+                    kg_hits = d.get(
+                        "kg_facts_count", event.get("kg_facts_count", 0)
+                    )
                 yield event
         except StopIteration as stop:
             if stop.value and isinstance(stop.value, dict):
-                final_text = stop.value.get("text", final_text)
+                sv = stop.value
+                sv_data = sv.get("data", sv) if isinstance(sv, dict) else {}
+                if isinstance(sv_data, dict):
+                    final_text = (
+                        sv_data.get("final_text")
+                        or sv_data.get("text")
+                        or final_text
+                    )
 
         # ── Post-process : AutoSkill / FailureMemory ───────────────────
         self._post_generation_analysis(
@@ -352,6 +405,84 @@ class RuneCortex:
         except Exception as exc:
             log.debug("Encode failed: %s", exc)
             return []
+
+    def _llm_skill_judge(self, prompt: str) -> dict | None:
+        """Callback LLM pour SkillExtractor : juge + extrait un skill.
+
+        Utilise le modèle déjà chargé (self.hippocampe.model) pour
+        décider si un échange mérite un skill et, si oui, produire le
+        JSON structuré (trigger / approach / validation / anti_patterns).
+        Le prompt (construit par SkillExtractor._extract_via_llm) demande
+        explicitement de renvoyer {"skip": true} si l'épisode est trivial.
+
+        Retourne le dict parsé, ou None (skip / erreur / pas de modèle).
+        Ne lève jamais : l'extraction de skill est un bonus, elle ne doit
+        pas casser le flux de chat.
+        """
+        model = getattr(self.hippocampe, "model", None)
+        if model is None or not getattr(model, "is_loaded", False):
+            # Pas de modèle chargé → on signale l'indisponibilité pour que
+            # SkillExtractor retombe sur l'heuristique (au lieu de traiter
+            # ça comme un « skip » qui empêcherait toute extraction).
+            from rune.memory.auto_skill import _LLM_UNAVAILABLE
+            return _LLM_UNAVAILABLE
+        try:
+            raw = model.generate(
+                prompt,
+                max_new_tokens=300,
+                temperature=0.2,  # déterministe : on veut du JSON stable
+            )
+        except Exception:
+            log.debug("LLM skill judge: génération échouée", exc_info=True)
+            return None
+
+        # Parse le JSON, tolérant aux fences markdown et au texte autour.
+        return self._parse_skill_json(raw)
+
+    @staticmethod
+    def _parse_skill_json(raw: str) -> dict | None:
+        """Extrait le premier objet JSON d'une réponse LLM.
+
+        Tolère : fences ```json, préambule, texte après. Retourne None
+        si rien d'exploitable ou si le JSON signale {"skip": true}.
+        """
+        import json
+        import re
+
+        if not raw or not raw.strip():
+            return None
+        text = raw.strip()
+        # Retire les fences markdown éventuelles.
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+        # Isole le premier bloc {...} équilibré si du texte l'entoure.
+        start = text.find("{")
+        if start == -1:
+            return None
+        depth = 0
+        end = -1
+        for i in range(start, len(text)):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        if end == -1:
+            return None
+        try:
+            obj = json.loads(text[start:end])
+        except Exception:
+            return None
+        if not isinstance(obj, dict):
+            return None
+        if obj.get("skip"):
+            return None
+        # Un skill valide doit au minimum avoir une approche non vide.
+        if not obj.get("approach"):
+            return None
+        return obj
 
     def _post_generation_analysis(
         self,

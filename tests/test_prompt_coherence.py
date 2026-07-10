@@ -98,7 +98,10 @@ def test_web_context_block_is_descriptive_not_injunctive():
     """The web-context injection block must use descriptive phrasing
     consistent with the post-fix-#10 identity block. Imperative
     'Tu DOIS' patterns trigger verbatim recitation."""
-    pytest.importorskip("torch", reason="lythea.hippocampe needs torch")
+    try:
+        import torch  # noqa: F401
+    except (ImportError, OSError):
+        pytest.skip("torch not available or broken CUDA")
 
     from unittest.mock import MagicMock
     from rune.hippocampe import Hippocampe

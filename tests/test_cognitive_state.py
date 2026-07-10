@@ -203,7 +203,7 @@ def test_lexical_does_not_detect_technical_terms(text):
 
     These terms are common in Mika's professional vocabulary
     (chemometrics, NDT, metrology). False positives here would make
-    Lythéa "feel sad" every time the user discusses their work.
+    Rune "feel sad" every time the user discusses their work.
     """
     v = _detect_lexical_affect(text)
     # Either low confidence OR positive/neutral valence is acceptable.
@@ -274,7 +274,7 @@ def test_affect_state_reset_latch_after_n_quiet_turns():
 
 
 def test_affect_state_intrinsic_signal_full_weight():
-    """Intrinsic curiosity should drive Lythéa's affect even with no user signal."""
+    """Intrinsic curiosity should drive Rune's affect even with no user signal."""
     state = AffectState(inertia=0.0)
     intr = AffectVector(valence=0.5, arousal=0.7, target="topic", confidence=0.8)
     state.empathic_update(
@@ -427,7 +427,7 @@ def test_render_blocks_respect_max_chars():
 
 
 def test_anti_sycophant_positive_burst_does_not_full_mirror():
-    """5 enthusiastic messages must not push Lythéa to full positive mirror."""
+    """5 enthusiastic messages must not push Rune to full positive mirror."""
     cs = CognitiveState(config=CognitiveStateConfig(contagion_max=0.4))
     for _ in range(5):
         cs.observe_user_message("c'est absolument parfait, génial, j'adore !!!")
@@ -438,11 +438,11 @@ def test_anti_sycophant_positive_burst_does_not_full_mirror():
 
 
 def test_anti_sycophant_negative_burst_does_not_full_mirror():
-    """5 angry messages must not push Lythéa to full negative mirror."""
+    """5 angry messages must not push Rune to full negative mirror."""
     cs = CognitiveState(config=CognitiveStateConfig(contagion_max=0.4))
     for _ in range(5):
         cs.observe_user_message("c'est horrible, je suis furieux, putain merde !!!")
-    # Compassion + capped contagion → Lythéa softens, doesn't fully match
+    # Compassion + capped contagion → Rune softens, doesn't fully match
     assert cs.lythea_affect.current.valence > -0.95, (
         f"Negative mirror detected: v={cs.lythea_affect.current.valence:.3f}"
     )
@@ -465,12 +465,12 @@ def test_friction_explicit_drops_trust():
 
 
 def test_friction_external_sadness_does_not_drop_trust():
-    """Sad message about an external topic must not erode trust in Lythéa."""
+    """Sad message about an external topic must not erode trust in Rune."""
     cs = CognitiveState()
     for _ in range(5):
         cs.observe_user_message("merci")
     high = cs.user_trust.score
-    # Sad about politics, not about Lythéa
+    # Sad about politics, not about Rune
     cs.observe_user_message("je suis triste à cause de la situation politique")
     # Trust should not drop because no 2nd-person marker
     assert cs.user_trust.score >= high - 0.01  # allow normal +0.02 gain

@@ -43,7 +43,7 @@ from pathlib import Path
 
 from rune.config import SESSIONS_DIR
 
-log = logging.getLogger("lythea.sessions")
+log = logging.getLogger("rune.sessions")
 
 
 @dataclass

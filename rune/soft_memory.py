@@ -88,7 +88,7 @@ except ImportError:  # pragma: no cover
     nn = None  # type: ignore
     _TORCH = False
 
-log = logging.getLogger("lythea.soft_memory")
+log = logging.getLogger("rune.soft_memory")
 
 
 # ── Config ────────────────────────────────────────────────────────────

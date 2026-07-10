@@ -40,7 +40,7 @@ The composite is::
     S_composite = w₁·S_structural + w₂·S_episodic + w₃·S_predictive
     S_global    = S_composite × (1 - discount_chroma)
 
-Weights live in :mod:`lythea.config` so calibration is data-driven.
+Weights live in :mod:`rune.config` so calibration is data-driven.
 
 The phase also computes the **doubt index** post-generation, from
 the per-token entropies of the LLM's *output*. This is the dual
@@ -76,7 +76,7 @@ from rune.config import (
     SURPRISE_W_STRUCTURAL,
 )
 
-log = logging.getLogger("lythea.cognition.surprise")
+log = logging.getLogger("rune.cognition.surprise")
 
 
 # Doubt-index thresholds. Below 0.3 the model is essentially

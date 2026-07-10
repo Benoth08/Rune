@@ -1,4 +1,4 @@
-"""Tests for :mod:`lythea.cognition.cascade`.
+"""Tests for :mod:`rune.cognition.cascade`.
 
 The cascade is mocked end-to-end — no real Gemini API, no real
 local model. We use pytest-style fakes to verify that each branch
@@ -136,7 +136,7 @@ class TestHappyPath:
         )
 
         result = cascade.generate(
-            system_prompt="You are Taëlys.",
+            system_prompt="You are Rune.",
             messages=[{"role": "user", "content": "Je vis à Aix"}],
         )
 
@@ -397,7 +397,7 @@ class TestGeminiReinforcement:
 
     Added in V3.9.2 after empirical observation that Gemini 2.5 Flash
     violates the anti-personification rules (10) about half the time
-    on Lythéa's standard 4-message test sequence. The reinforcement
+    on Rune's standard 4-message test sequence. The reinforcement
     states the most-violated rules first, framed as non-negotiable.
     """
 
@@ -422,7 +422,7 @@ class TestGeminiReinforcement:
             gemini=_make_gemini(),
             local_generator=_make_local(),
         )
-        base = "Tu es Taëlys, etc. Règle 1: bla bla. Règle 10: bla."
+        base = "Tu es Rune, etc. Règle 1: bla bla. Règle 10: bla."
         result = cascade._reinforce_for_gemini(base)
         # Base is preserved
         assert "Règle 10" in result
@@ -450,7 +450,7 @@ class TestGeminiReinforcement:
             synthesis_threshold_tokens=10,
         )
         cascade.generate(
-            system_prompt="Tu es Taëlys.",
+            system_prompt="Tu es Rune.",
             messages=[{"role": "user", "content": "x"}],
         )
         # Inspect the actual call made on the Gemini client.
@@ -459,7 +459,7 @@ class TestGeminiReinforcement:
         # Reinforcement preamble is present
         assert "RÈGLES CRITIQUES" in sent_system
         # Original base is also present
-        assert "Tu es Taëlys." in sent_system
+        assert "Tu es Rune." in sent_system
 
 
 class TestCorrectiveSynthesisPrompt:
@@ -515,11 +515,11 @@ class TestCorrectiveSynthesisPrompt:
         long_draft = (
             "Je connais bien Anthropic, c'est une organisation très "
             "intéressante. Je visualise leur travail comme une révolution "
-            "de l'IA. Mon expérience me dit que Lythéa doit être un "
+            "de l'IA. Mon expérience me dit que Rune doit être un "
             "projet fascinant qui regroupe beaucoup de talents."
         )
         gemini = _make_gemini(text=long_draft)
-        local = _make_local("Anthropic, ça t'occupe sur Lythéa ?")
+        local = _make_local("Anthropic, ça t'occupe sur Rune ?")
         cascade = CascadeGenerator(
             gemini=gemini,
             local_generator=local,
@@ -527,7 +527,7 @@ class TestCorrectiveSynthesisPrompt:
         )
 
         cascade.generate(
-            system_prompt="Tu es Taëlys.",
+            system_prompt="Tu es Rune.",
             messages=[{"role": "user", "content": "x"}],
         )
 

@@ -58,7 +58,7 @@ import logging
 import time
 from typing import Any, Callable
 
-log = logging.getLogger("lythea.cognition.deep_reasoning")
+log = logging.getLogger("rune.cognition.deep_reasoning")
 
 
 # ── Budgets par étape ──────────────────────────────────────────────────

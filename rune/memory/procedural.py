@@ -68,7 +68,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-log = logging.getLogger("lythea.memory.procedural")
+log = logging.getLogger("rune.memory.procedural")
 
 
 # ── Dataclass ──────────────────────────────────────────────────────────

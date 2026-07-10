@@ -129,12 +129,37 @@ class FailureMemory:
 
     def add(self, pattern: FailurePattern) -> FailurePattern:
         """Ajoute un pattern. Si similaire existe, incrémente occurrences."""
-        # Borne les champs
-        pattern.context = pattern.context[:MAX_CONTEXT_CHARS]
-        pattern.attempted_action = pattern.attempted_action[:MAX_ACTION_CHARS]
-        pattern.symptom = pattern.symptom[:MAX_SYMPTOM_CHARS]
-        pattern.root_cause = pattern.root_cause[:MAX_ROOT_CAUSE_CHARS]
-        pattern.correction = pattern.correction[:MAX_CORRECTION_CHARS]
+        # ── Garde-fou sécurité ─────────────────────────────────────────
+        # Les FailurePatterns sont RÉINJECTÉS dans le prompt système via
+        # as_warning_block() à chaque tour similaire. Sans ce contrôle,
+        # un contenu malveillant (venant du message utilisateur repris
+        # dans context/attempted_action, ou d'une sortie LLM) devient une
+        # injection persistante. Même politique que AutoSkillStore.
+        from rune.memory.auto_skill import _content_is_forbidden, sanitize_for_prompt
+        full_text = " ".join([
+            pattern.context, pattern.attempted_action, pattern.symptom,
+            pattern.root_cause, pattern.correction,
+        ])
+        if _content_is_forbidden(full_text):
+            log.warning(
+                "Failure pattern %s rejected: forbidden content",
+                pattern.failure_id,
+            )
+            return pattern
+
+        # Neutralise la structure (sauts de ligne / tokens de chat) et
+        # borne les champs — défense en profondeur avant persistance.
+        pattern.context = sanitize_for_prompt(pattern.context, MAX_CONTEXT_CHARS)
+        pattern.attempted_action = sanitize_for_prompt(
+            pattern.attempted_action, MAX_ACTION_CHARS
+        )
+        pattern.symptom = sanitize_for_prompt(pattern.symptom, MAX_SYMPTOM_CHARS)
+        pattern.root_cause = sanitize_for_prompt(
+            pattern.root_cause, MAX_ROOT_CAUSE_CHARS
+        )
+        pattern.correction = sanitize_for_prompt(
+            pattern.correction, MAX_CORRECTION_CHARS
+        )
 
         # Dédup par similarité
         if pattern.embedding:
@@ -234,9 +259,13 @@ class FailureMemory:
         return [p for _, p in results[:top_k]]
 
     def _save(self) -> None:
+        # _to_native() convertit les scalaires numpy/torch (embedding,
+        # occurrences venant de calculs) en types Python natifs, sinon
+        # json.dump peut lever « not JSON serializable » et aucun
+        # failure pattern n'est persisté.
         data = {
             "version": 1,
-            "failures": [f.as_dict() for f in self._failures.values()],
+            "failures": [_to_native(f.as_dict()) for f in self._failures.values()],
         }
         tmp = self._index_path.with_suffix(".tmp")
         with tmp.open("w", encoding="utf-8") as f:
@@ -246,6 +275,7 @@ class FailureMemory:
     def _load(self) -> None:
         if not self._index_path.exists():
             return
+        from rune.memory.auto_skill import _content_is_forbidden
         try:
             with self._index_path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -255,6 +285,19 @@ class FailureMemory:
                         k: v for k, v in entry.items()
                         if k in FailurePattern.__dataclass_fields__  # type: ignore[attr-defined]
                     })
+                    # Quarantaine au chargement : un failures.json édité à
+                    # la main (ou hérité d'une version sans filtre) ne doit
+                    # pas réinjecter d'instruction interdite dans le prompt.
+                    full = " ".join([
+                        pattern.context, pattern.attempted_action,
+                        pattern.symptom, pattern.root_cause, pattern.correction,
+                    ])
+                    if _content_is_forbidden(full):
+                        log.warning(
+                            "Failure pattern %s skipped at load: forbidden content",
+                            pattern.failure_id,
+                        )
+                        continue
                     self._failures[pattern.failure_id] = pattern
                 except Exception as exc:
                     log.warning("Failed to load failure entry: %s", exc)
@@ -263,6 +306,24 @@ class FailureMemory:
 
 
 # ── Helper ────────────────────────────────────────────────────────────
+
+
+def _to_native(obj):
+    """Convertit récursivement numpy/torch scalars en types natifs.
+
+    Voir rune.memory.auto_skill._to_native — même rôle : éviter que
+    json.dump casse sur np.float32/torch.Tensor à la persistance.
+    """
+    if isinstance(obj, dict):
+        return {k: _to_native(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_native(x) for x in obj]
+    if hasattr(obj, "item") and not isinstance(obj, (str, bytes)):
+        try:
+            return obj.item()
+        except Exception:
+            pass
+    return obj
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:

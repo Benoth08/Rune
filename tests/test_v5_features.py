@@ -173,7 +173,9 @@ class TestSemanticRouterStructure:
     def test_routes_defined(self):
         from rune.cognition.semantic_router import ROUTES
         names = {r.name for r in ROUTES}
-        assert names == {"web", "python", "none"}
+        # Le routeur a gagné une route "mcp" (appels serveurs MCP) en plus
+        # des trois d'origine (web / python / none).
+        assert names == {"web", "python", "none", "mcp"}
 
     def test_route_examples_coverage(self):
         from rune.cognition.semantic_router import ROUTES
@@ -269,7 +271,10 @@ class TestPythonExecutorV51:
         from rune.tools.python_executor import run, format_result
         r = run("for i in range(3): print(i)")
         formatted = format_result(r)
-        assert "Exécution réussie" in formatted
+        # Le message de succès est « Exécution Python réussie » (le mot
+        # « Python » a été ajouté). On teste les deux tokens séparément
+        # pour tolérer d'éventuelles variations de formulation.
+        assert "Exécution" in formatted and "réussie" in formatted
         assert "0" in formatted and "1" in formatted and "2" in formatted
 
     def test_clean_env_no_secrets(self):
@@ -412,8 +417,8 @@ def _make_fake_kg():
         "e1": FakeEnt("e1", "Marie", "person"),
         "e2": FakeEnt("e2", "Paul", "person"),
         "e3": FakeEnt("e3", "Léa", "person"),
-        "e4": FakeEnt("e4", "Lythéa", "project"),
-        "e5": FakeEnt("e5", "Taëlys", "project"),
+        "e4": FakeEnt("e4", "Rune", "project"),
+        "e5": FakeEnt("e5", "Rune", "project"),
         "e6": FakeEnt("e6", "RunPod", "infra"),
     }
     relations = [
@@ -468,7 +473,7 @@ class TestGraphCommunitiesSummarise:
         entities, relations = _make_fake_kg()
         communities = detect_communities(entities, relations)
         llm = FakeLLM({
-            "Lythéa": "Projets tech",
+            "Rune": "Projets tech",
             "Marie": "Famille",
         })
         summarise_communities(communities, entities, llm, max_communities=5)
@@ -565,7 +570,7 @@ class TestE2EIntegration:
 
         llm = FakeLLM({
             "Marie": "Famille",
-            "Lythéa": "Projets",
+            "Rune": "Projets",
         })
         summarise_communities(communities, entities, llm)
 

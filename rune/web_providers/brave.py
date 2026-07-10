@@ -39,7 +39,7 @@ import urllib.request
 
 from rune.web_providers.base import SearchResult
 
-log = logging.getLogger("lythea.web_providers.brave")
+log = logging.getLogger("rune.web_providers.brave")
 
 
 # Brave's official API endpoint.

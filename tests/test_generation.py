@@ -1,4 +1,4 @@
-"""Unit tests for :mod:`lythea.cognition.generation`.
+"""Unit tests for :mod:`rune.cognition.generation`.
 
 Covers:
 * ``strip_reasoning`` — the reasoning-tag splitter (case-insensitive,

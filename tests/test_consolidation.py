@@ -1,4 +1,4 @@
-"""Unit tests for :class:`lythea.cognition.consolidation.ConsolidationPhase`.
+"""Unit tests for :class:`rune.cognition.consolidation.ConsolidationPhase`.
 
 The phase is a thin orchestration layer over the actual consolidation
 engine (:class:`MicrosleepManager`) — what we test here is the

@@ -37,7 +37,7 @@ from rune.web_providers.searxng import SearxngProvider
 from rune.web_providers.serper import SerperProvider
 from rune.web_providers.tavily import TavilyProvider
 
-log = logging.getLogger("lythea.web_providers.factory")
+log = logging.getLogger("rune.web_providers.factory")
 
 
 _REGISTRY: dict[str, type] = {

@@ -1,341 +1,286 @@
 # Rune
 
-> Agent IA cognitif **local**, **headless**, **open-weights only** — sous-module agentique de Taëlys (Lythea) qui ajoute auto-skill, subagents, cron, pool multi-modèles (Trinity) et cascade extérieure (Gemini/Claude).
+```
+  ____    _   _   _   _   _____       _       ____   _____   _   _   _____
+ |  _ \  | | | | | \ | | | ____|     / \     / ___| | ____| | \ | | |_   _|
+ | |_) | | | | | |  \| | |  _|      / _ \   |  _  |  _|   |  \| |   | |
+ |  _ <  | |_| | | |\  | | |___    / ___ \  | |_| | | |___  | |\  |   | |
+ |_| \_\  \___/  |_| \_| |_____|  /_/   \_\  \____| |_____| |_| \_|  |_|
+```
 
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-63%20passed-brightgreen)](#tests)
+> **Agent cognitif local, headless, *open-weights only*.**
+> Une boucle cognitive biomimétique (encodage -> surprise -> rappel -> génération -> consolidation) posée sur une mémoire persistante multi-étages, avec extension agentique (auto-apprentissage de compétences, sous-agents, cron).
+
+**Statut : v0.1.0 — projet en développement actif.** Le cœur cognitif est fonctionnel et vérifié sur GPU ; plusieurs briques agentiques sont câblées mais pas encore validées en production (voir [État du projet](#état-du-projet)). Ce README distingue explicitement **ce qui marche** de **ce qui reste à faire**.
 
 ---
 
-## Ce qu'est Rune
+## Table des matières
 
-**Lythea v5.8** est un assistant LLM local avec un cycle cognitif biomimétique remarquable (encodage → surprise → retrieval → génération → consolidation), une mémoire multi-étages (SDM + MHN + KG + Chroma), du steering CAA, de la métacognition, du deep reasoning, du vision active, etc.
+- [En une phrase](#en-une-phrase)
+- [Ce que Rune apporte](#ce-que-rune-apporte)
+- [Différence avec les harnais agentiques classiques](#différence-avec-les-harnais-agentiques-classiques)
+- [Aperçu — le dashboard live](#aperçu--le-dashboard-live)
+- [État du projet](#état-du-projet)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Utilisation](#utilisation)
+- [Configuration](#configuration)
+- [Roadmap](#roadmap)
+- [Tests](#tests)
+- [Lignage](#lignage)
 
-**Rune** est un sous-module agentique de Taëlys (Lythea). Il ajoute les capacités d'agent autonome : auto-skill (SKILL.md), subagents isolés, cron de fond, pool multi-modèles (Trinity), cascade extérieure (Gemini/Claude).
+---
 
-**Rune** = Lythea (intégralement conservé) + extensions agentiques :
+## En une phrase
 
-| Feature | Lythea v5.8 | **Rune** |
+La plupart des harnais agentiques sont des **orchestrateurs sans mémoire** qui pilotent une API LLM cloud. Rune est l'inverse : un **agent avec un état cognitif persistant** qui tourne **entièrement en local sur des modèles open-weights**, décide lui-même de ce qui mérite d'être mémorisé, et ré-exploite son vécu au fil des sessions.
+
+---
+
+## Ce que Rune apporte
+
+**1. Une mémoire qui persiste et se hiérarchise.**
+Au lieu d'une simple fenêtre de contexte, Rune maintient plusieurs étages complémentaires :
+
+- **MHN** (Modern Hopfield Network) — mémoire épisodique associative, rappel par énergie.
+- **KG** (Knowledge Graph) — faits et relations extraits, requêtables.
+- **Chroma** — mémoire sémantique vectorielle avec RAG hybride + reranking, et désormais un **cycle de vie** (création -> l'accès protège de l'oubli -> purge des chunks non consultés ; les souvenirs consolidés sont permanents).
+
+**2. Un cycle cognitif inspiré des neurosciences.**
+Chaque échange traverse : encodage -> calcul de *surprise* -> rappel mémoire ciblé -> génération -> consolidation (micro-sleep). La consolidation promeut les souvenirs marquants de l'épisodique (MHN) vers le sémantique permanent (Chroma), comme un sharp-wave ripple.
+
+**3. Un auto-apprentissage de compétences (AutoSkill).**
+Quand un échange révèle une **méthode réutilisable** (résoudre un type de problème), Rune en extrait un *skill* structuré (déclencheur, approche, validation, anti-patterns), le persiste, et le réinjecte quand une situation similaire se présente. Un filtre à deux couches (heuristique + jugement LLM) évite de transformer une simple conversation en compétence. Des garde-fous anti-injection protègent le contenu réinjecté dans le prompt.
+
+**4. Le tout en local, sans dépendance cloud obligatoire.**
+Modèles open-weights (Qwen, Mistral, Gemma, Phi, LFM...), quantification 4-bit NF4, chargement paresseux. Aucune clé API requise pour le fonctionnement de base. Une cascade optionnelle vers des modèles cloud existe mais est **désactivée par défaut**.
+
+---
+
+## Différence avec les harnais agentiques classiques
+
+> **Note d'honnêteté.** Rune s'inspire d'un harnais interne (« Hermès ») dont le code n'est pas public ici ; les comparaisons ci-dessous portent sur la **catégorie** des harnais agentiques (orchestrateurs type AutoGPT / SWE-agent / OpenHands et similaires), pas sur un produit précis dont on reproduirait des specs. L'objectif est de situer la **philosophie** de Rune, pas de dénigrer d'autres outils.
+
+| Axe | Harnais agentiques classiques | **Rune** |
 |---|---|---|
-| Cycle cognitif biomimétique (5 phases) | ✅ | ✅ |
-| Mémoire SDM + MHN + KG + Chroma | ✅ | ✅ |
-| Steering CAA (hooks PyTorch) | ✅ | ✅ |
-| Métacognition multi-signaux | ✅ (V4.4) | ✅ |
-| Deep reasoning (chaîne 4 étapes) | ✅ | ✅ |
-| Vision active (zoom cognitif VLM) | ✅ | ✅ |
-| Cascade Gemini (draft-then-refine) | ✅ | ✅ |
-| Web providers (Brave, DDG, SearXNG…) | ✅ | ✅ |
-| Inhibition (3 niveaux) | ✅ | ✅ |
-| Predictive coding (Friston) | ✅ | ✅ |
-| Timeline + incohérence temporelle | ✅ | ✅ |
-| Planning (PFC latéral) | ✅ | ✅ |
-| Reflection + auto-calibration | ✅ | ✅ |
-| CRAG (Corrective RAG) | ✅ | ✅ |
-| GraphRAG (communities) | ✅ | ✅ |
-| Consolidation microsleep/deep sleep | ✅ | ✅ |
-| MCP support | ✅ | ✅ |
-| Agent Taëlys (orchestrator + workers) | ✅ | ✅ |
-| **AutoSkill (SKILL.md auto)** | ❌ (procédural passif) | ✅ **+ métacognition filtre** |
-| **FailureMemory (anti-patterns)** | ❌ | ✅ **unique** |
-| **SubAgent spawner (subprocess)** | ❌ (workers in-process) | ✅ |
-| **Cron + consolidation post-run** | ❌ | ✅ **+ microsleep** |
-| **TieredRetriever strict (5 niveaux)** | partiel | ✅ |
-| **WorkingMemoryBuffer (Core 4±1)** | ❌ | ✅ |
-| **Headless (CLI + API, pas d'UI)** | ❌ (UI lourde) | ✅ |
-| **Speculative decoding** | ❌ | ✅ |
-| Modèles open-source + accès poids | ✅ | ✅ |
+| **Exécution** | API LLM cloud (OpenAI, Anthropic...) | **Local, open-weights** ; cloud optionnel et *off* par défaut |
+| **État entre sessions** | Sans mémoire, ou historique brut re-collé | **Mémoire persistante hiérarchisée** (MHN + KG + Chroma) avec cycle de vie |
+| **Apprentissage** | Aucun — recommence à zéro | **AutoSkill** : extrait et réutilise des compétences vérifiées |
+| **Sélection mémoire** | Fenêtre de contexte / RAG naïf | **Surprise cognitive** gouverne quoi encoder ; RAG correctif (CRAG) |
+| **Objet central** | Une *tâche* à accomplir | Un *agent* avec un vécu qui s'accumule |
+| **Confidentialité** | Données envoyées au cloud | **Rien ne sort de la machine** (mode local) |
+
+**Ce que Rune ne cherche PAS à être.** Ce n'est pas un agent de codage autonome type « résous ce ticket GitHub tout seul ». C'est un **substrat cognitif** : un agent local qui apprend de ses interactions et construit une mémoire durable. Les deux approches sont complémentaires, pas concurrentes.
+
+---
+
+## Aperçu — le dashboard live
+
+Rune est *headless* (pas d'interface web), mais fournit un **dashboard terminal** temps réel (`rune dashboard`) qui suit un serveur `rune serve`. Il affiche la mission en cours, les sous-agents, le blackboard partagé, l'état mémoire, la métacognition et les compétences apprises :
+
+```
++-------------------------------------------------------------------------------+
+|   ____    _   _   _   _   _____       _       ____   _____   _   _   _____      |
+|  |  _ \  | | | | | \ | | | ____|     / \     / ___| | ____| | \ | | |_   _|     |
+|  | |_) | | | | | |  \| | |  _|      / _ \   |  _  |  _|   |  \| |   | |          |
+|  | |_ <  | |_| | | |\  | | |___    / ___ \  | |_| | | |___  | |\  |   | |        |
+|  |_| \_\  \___/  |_| \_| |_____|  /_/   \_\  \____| |_____| |_| \_|  |_|         |
+|                                                                               |
+|         Rune v0.1.0  .  Trinity: OFF (single-model)  .  19:04:09              |
++-------------------------------------------------------------------------------+
++- Mission courante -----------------------+ +- Mémoire -------------------------+
+| Task  : Analyser le fichier de logs      | | MHN    : 128 / 512  patterns      |
+| Phase : retrieval -> qwen2.5-7b          | | KG     : 87 entités . 143 rel.    |
+| Elapsed : 2.4s   |   Tokens : 312        | | Chroma : 1 204 chunks             |
++------------------------------------------+ | Skills : 2 actifs . 1 fiable      |
++- Subagents ------------------------------+ +-----------------------------------+
+|  #  Section        Statut     Modèle     | +- Métacognition -------------------+
+|  1  analyse_logs   done       qwen-7b    | | Doute       : 0.18  (certaine)    |
+|  2  synthèse       run        qwen-7b    | | Surprise    : 0.42                |
++------------------------------------------+ |  struct 0.31 . épisod 0.55        |
++- Blackboard -----------------------------+ |  prédict --  . chroma -0.12       |
+| Section      Wins  Fails  Notes  Statut  | +-----------------------------------+
+| _contract    -     -      -    objectif  | +- Skills actifs -------------------+
+| analyse_logs 3     0      1    validé    | | ID          Trigger      Succ Conf|
+| synthèse     1     0      0    en cours  | | skill_e9d9  débug segf.   5  0.87 |
++------------------------------------------+ | skill_20de  requête SQL   1  0.70 |
++- Logs -----------------------------------+ +-----------------------------------+
+| 19:04:07  Retention GC: 0 stale chunks   |
+| 19:04:08  Skill applied: skill_e9d9.     |
+| 19:04:09  Consolidation: 2 -> Chroma     |
++------------------------------------------+
+```
+
+> Illustration représentative de la disposition réelle (`rune/cli/dashboard.py`). Les valeurs dépendent de l'état courant. `prédict --` reflète que la composante prédictive de la surprise est inerte (voir Roadmap).
+
+---
+
+## État du projet
+
+L'honnêteté sur la maturité est un principe du projet. **« Couvert par les tests » et « vérifié en production » sont deux choses différentes** : la suite compte **1485 tests unitaires au vert**, mais plusieurs briques n'ont pas encore été exercées avec un vrai modèle sur GPU.
+
+### Fonctionnel et vérifié bout-en-bout (sur GPU)
+
+| Brique | Détail |
+|---|---|
+| **Boot complet** | Chargement Hippocampe (MHN, KG, Chroma), modèle open-weights, quantif 4-bit |
+| **Chat cognitif** | Streaming, pipeline encodage->surprise->rappel->génération->consolidation, identité stable |
+| **Mémoire persistante** | MHN + KG + Chroma opérationnels, RAG hybride + reranking + CRAG |
+| **AutoSkill** | Extraction, persistance JSON, réinjection, filtre anti-conversation, garde-fous sécurité |
+| **Rétention Chroma** | Cycle de vie création->accès->purge, consolidés permanents, mode dry-run de sûreté |
+| **CLI** | `chat`, `serve`, `status`, `skills`, `dashboard` |
+
+### Câblé mais non vérifié en production
+
+| Brique | Statut |
+|---|---|
+| **Sous-agents** | Spawner câblé ; `--lightweight` utilise un backend *mock* — jamais exercé avec un vrai modèle |
+| **Cron / scheduler** | `CronScheduler` intégré au runtime, non déclenché en conditions réelles |
+| **Dashboard live** | Rendu implémenté ; nécessite `rune serve` actif en parallèle |
+
+### Présent mais dormant (par conception ou configuration)
+
+| Brique | Raison |
+|---|---|
+| **Trinity** (multi-modèles) | `OFF` par défaut — mode single-model |
+| **Cascade Claude/Gemini** | Désactivée par défaut (`enable_cascade=False`) — nécessite des clés API |
+| **Recherche web** | Chaîne composite en place (SearXNG -> DDG...) mais SearXNG public peu fiable ; recommandé : clé Tavily/Serper |
+| **Predictive coding** (Friston) | Désactivé par défaut |
+| **SDM / surprise prédictive** | Inerte — sous-système en cours de ré-évaluation (câblage causal insuffisant) |
 
 ---
 
 ## Architecture
 
 ```
-rune/                       # Package principal (anciennement lythea/)
-├── hippocampe.py                    # ← Cœur cognitif Lythea (3526 lignes, INTACT)
-├── cognition/                       # ← 26 modules cognitifs Lythea (INTACTS)
-│   ├── encoding.py                  #   cortex entorhinal
-│   ├── storage.py                   #   hippocampe CA3
-│   ├── surprise.py                  #   ripples + dopamine
-│   ├── retrieval.py                 #   pattern completion
-│   ├── generation.py                #   two-pass reasoning
-│   ├── consolidation.py             #   microsleep + deep sleep
-│   ├── metacognition.py             #   mPFC + dACC
-│   ├── inhibition.py                #   contrôle inhibiteur 3 niveaux
-│   ├── planning.py                  #   PFC latéral
-│   ├── predictive_coding.py         #   Friston
-│   ├── timeline.py                  #   chronologie narrative
-│   ├── deep_reasoning.py            #   chaîne 4 étapes
-│   ├── reflection.py                #   auto-critique
-│   ├── cascade.py                   #   Gemini draft-then-refine
-│   ├── crag.py                      #   Corrective RAG
-│   ├── graph_communities.py         #   GraphRAG
-│   ├── semantic_router.py           #   multi-tool routing
-│   ├── vision_semantic.py           #   zoom cognitif VLM
-│   ├── ... (26 modules au total)
-│   └── *_rune.py                  # ← Extensions Rune (consolidation, surprise, metacog)
-│
-├── memory/                          # ← Mémoire Lythea (INTACTE) + extensions Rune
-│   ├── sdm.py                       #   Sparse Distributed Memory (Kanerva)
-│   ├── mhn.py                       #   Modern Hopfield Network
-│   ├── kg.py                        #   Knowledge Graph (GLiNER + RapidFuzz)
-│   ├── retrieval.py                 #   HybridRetriever (cross-encoder)
-│   ├── procedural.py                #   mémoire procédurale Lythea
-│   ├── cognitive_state.py           #   état affectif (valence/arousal)
-│   ├── salience.py                  #   filtre de saillance
-│   ├── visual_working_memory.py     #   tampon visuel
-│   ├── health.py                    #   health monitoring
-│   ├── working_memory.py            # ← NOUVEAU Rune : Core 4±1 chunks (Cowan)
-│   ├── tiered_retriever.py          # ← NOUVEAU Rune : Core→SDM→MHN→KG→Chroma
-│   ├── auto_skill.py                # ← NOUVEAU Rune : SKILL.md auto-extraction
-│   └── failure_memory.py            # ← NOUVEAU Rune : anti-patterns
-│
-├── steering/                        # ← Steering CAA Lythea (INTACT)
-├── agentic/                         # ← Agent Taëlys Lythea (INTACT)
-├── web_providers/                   # ← Web search multi-fournisseurs Lythea (INTACT)
-├── mcp/                             # ← MCP support Lythea (INTACT)
-├── tools/                           # ← Python executor Lythea (INTACT)
-├── external/                        # ← Cascade Gemini Lythea (INTACT)
-├── server/                          # ← API FastAPI Lythea (sans static/)
-│   ├── app.py                       #   (modifié : pas de StaticFiles)
-│   └── routes.py                    #   (2755 lignes, INTACT)
-│
-├── cortex_ext/                      # ← Couche d'intégration Rune (NOUVEAU)
-│   └── integration.py               #   RuneCortex wrap Hippocampe + extensions
-│
-├── perf/                            # ← Backend modèle abstrait (NOUVEAU)
-│   ├── backend.py                   #   interface ModelBackend
-│   ├── mock.py                      #   MockBackend (tests)
-│   ├── transformers_backend.py      #   HF in-process + speculative decoding
-│   └── speculative.py               #   SpeculativeDecoder (draft + verify)
-│
-├── agents/                          # ← SubAgent + Cron (NOUVEAU)
-│   ├── subagent.py                  #   subprocess isolé + sandbox
-│   ├── cron.py                      #   scheduler + consolidation post-run
-│   └── _runtime.py                  #   runtime subagent
-│
-├── channels/                        # ← Adaptateurs omnicanal (NOUVEAU)
-│   ├── base.py                      #   ChannelAdapter abstrait
-│   ├── console.py                   #   CLI interactif
-│   ├── telegram_channel.py          #   Telegram
-│   └── slack_channel.py             #   Slack
-│
-├── cli/                             # ← CLI Typer (NOUVEAU)
-│   └── main.py                      #   chat, run, serve, skills, cron, consolidate
-│
-└── utils/                           # ← Config + logging
+rune/
+├── hippocampe.py            # Orchestrateur du cycle cognitif
+├── model.py                 # Wrapper modèles HF (4-bit, streaming, cascade)
+├── cognition/
+│   ├── encoding.py          #   Encodage + filtre de salience
+│   ├── surprise.py          #   Surprise composite (structurelle + épisodique + prédictive)
+│   ├── retrieval.py         #   RAG hybride + CRAG + rafraîchissement d'accès
+│   ├── generation.py        #   Génération
+│   ├── storage.py           #   Écriture mémoire pondérée par la surprise
+│   ├── consolidation.py     #   Micro-sleep : MHN -> Chroma, GC de rétention
+│   └── predictive_coding.py #   Codage prédictif (Friston, désactivé par défaut)
+├── memory/
+│   ├── mhn.py               #   Modern Hopfield Network (épisodique)
+│   ├── sdm.py               #   Sparse Distributed Memory (inerte, en réévaluation)
+│   ├── tiered_retriever.py  #   Fallback Core -> SDM(inerte) -> MHN -> KG -> Chroma
+│   ├── auto_skill.py        #   AutoSkill : extraction + garde-fous
+│   ├── failure_memory.py    #   Patterns d'échec réinjectés en avertissement
+│   └── salience.py          #   Cascade anti-bruit N1/N2/N3
+├── agents/
+│   ├── subagent.py          #   Sous-agents (spawner)
+│   └── cron.py              #   Tâches planifiées
+├── cortex_ext/
+│   └── integration.py       #   RuneCortex : couche agentique sur Hippocampe
+├── server/                  #   API HTTP headless (FastAPI) + auth
+└── cli/
+    ├── main.py              #   Commandes Typer
+    └── dashboard.py         #   Dashboard terminal live
 ```
-
-**Volume total** : ~45 000 lignes Python (42 000 Lythea + 3 000 extensions Rune).
 
 ---
 
 ## Installation
 
+Testé sur RunPod (image CUDA, Python 3.12, PyTorch 2.8).
+
 ```bash
-# Installation complète (avec GPU)
-pip install -e ".[channels,dev]"
+# 1. Décompresser puis installer (crée la commande `rune`)
+tar -xzf rune_v0_1_1_tar.gz
+cd rune
+pip install -e . --no-deps --break-system-packages
 
-# Installation minimale (tests sans GPU)
-pip install -e ".[dev]"
-
-# Sans channels (Telegram/Slack)
-pip install -e .
+# 2. (Optionnel) déploiement complet des dépendances ML
+bash deploy.sh
 ```
 
-## Démarrage rapide
+> Sans `pip install -e .`, la commande `rune` n'existe pas — repli : `python3 -m rune.cli <commande>`.
 
-### Mode console (nécessite GPU + modèle)
+---
 
-```bash
-rune chat
-```
-
-### Mode API (FastAPI complet Lythea)
+## Utilisation
 
 ```bash
-rune serve --port 7860
-# API sur http://localhost:7860
-```
+# Chat interactif (charge un modèle par défaut ; --searxng pour la recherche web locale)
+rune chat --model Qwen/Qwen2.5-7B-Instruct
 
-Puis :
+# Serveur HTTP headless (API /api/*, doc interactive sur /docs)
+rune serve
 
-```bash
-curl -X POST http://localhost:7860/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Bonjour"}'
-```
+# Dashboard live (dans un 2e terminal, pendant que le serveur tourne)
+rune dashboard
 
-### Gestion des skills (sans boot complet)
-
-```bash
+# Compétences apprises
 rune skills list
-rune skills show skill_abc123
-rune skills archive skill_abc123
-```
+rune skills show <skill_id>
 
-### Gestion du cron
-
-```bash
-rune cron list
-rune cron add --id veille --schedule "every:300s" --action "Veille tech"
-rune cron run veille
-rune cron start  # bloquant
-```
-
-### Status global
-
-```bash
+# État du système
 rune status
 ```
 
-### Subagent isolé
+**Interagir sans UI :** Rune est headless. On l'utilise via la CLI (`rune chat`), l'API (`POST /api/chat`, `POST /api/models/load`), ou la doc interactive Swagger sur `/docs`.
+
+---
+
+## Configuration
+
+Tout se règle via un fichier `.env` (préfixes `RUNE_` et `LYTHEA_`). Extraits utiles :
 
 ```bash
-rune run "Calcule fibonacci(10)" --lightweight
+# Modèle par défaut du chat
+RUNE_DEFAULT_MODEL=Qwen/Qwen2.5-7B-Instruct
+
+# Recherche web : "auto" = chaîne composite avec fallback (recommandé)
+LYTHEA_WEB_PROVIDER=auto
+# Pour une recherche fiable (gratuit, sans CB) : https://tavily.com
+# LYTHEA_TAVILY_API_KEY=tvly-...
+
+# Rétention mémoire (jours avant purge d'un chunk non consulté)
+RUNE_RETENTION_TTL_DAYS=30
+# Premier passage en observation, sans rien supprimer :
+# RETENTION_GC_DRY_RUN=1
+
+# Token HuggingFace (accélère les téléchargements, supprime le rate-limit)
+# HF_TOKEN=hf_...
 ```
 
 ---
 
-## CLI complet
+## Roadmap
 
-```
-rune chat            # mode interactif console (boot Hippocampe)
-rune run "task"      # exécute une mission (subagent)
-rune run "task" --lightweight  # sans boot Hippocampe
-rune serve           # démarre l'API HTTP Lythea (FastAPI complet)
-rune status          # statut global (léger, sans boot)
+Prochaines étapes, par ordre de priorité :
 
-rune skills list     # liste les skills auto-appris
-rune skills show ID  # détail d'un skill
-rune skills archive ID
-
-rune cron list       # liste les tâches cron
-rune cron add ...    # ajoute une tâche
-rune cron run ID     # exécute une tâche immédiatement
-rune cron start      # démarre le scheduler (bloquant)
-
-rune consolidate     # force un microsleep
-rune deep-sleep      # force un deep sleep
-```
-
----
-
-## Ce qui différencie Rune
-
-### 1. Lythea est conservé intégralement
-Tous les modules cognitifs de Lythea v5.8 sont présents et fonctionnels :
-- Cycle cognitif 5 phases (encode → store → retrieve → generate → consolidate)
-- Mémoire multi-étages (SDM + MHN + KG + Chroma + procedural + cognitive_state)
-- Steering CAA (axes, vectors, engine — hooks PyTorch)
-- Métacognition (mPFC + dACC, Brier calibration)
-- Deep reasoning (chaîne 4 étapes : décomposer → explorer → critiquer → synthétiser)
-- Vision active (zoom cognitif VLM, 50+ langues)
-- Cascade Gemini (draft-then-refine)
-- Inhibition (3 niveaux en cascade)
-- Predictive coding (Friston)
-- Timeline + détection d'incohérence temporelle
-- Planning (PFC latéral, GoalStack)
-- Reflection + auto-calibration
-- CRAG (Corrective RAG)
-- GraphRAG (communautés thématiques)
-- Consolidation microsleep/deep sleep (ripples + replay)
-- MCP support
-- Agent Taëlys (orchestrator + workers + verifier + blackboard + skills + sandbox)
-- Web providers (Brave, DDG, SearXNG, Serper, Tavily)
-
-### 2. Extensions Rune ajoutées
-- **RuneCortex** (`cortex_ext/integration.py`) — wrap Hippocampe avec hooks pre/post generation
-- **AutoSkill** (`memory/auto_skill.py`) — SKILL.md auto-extraction après succès vérifié, filtrée par métacognition
-- **FailureMemory** (`memory/failure_memory.py`) — anti-patterns appris des échecs (unique)
-- **TieredRetriever** (`memory/tiered_retriever.py`) — fallback strict Core → SDM → MHN → KG → Chroma
-- **WorkingMemoryBuffer** (`memory/working_memory.py`) — Core 4±1 chunks (Cowan 2001)
-- **SubAgentSpawner** (`agents/subagent.py`) — subprocess isolé + sandbox
-- **CronScheduler** (`agents/cron.py`) — tâches de fond + consolidation post-run
-- **SpeculativeDecoder** (`perf/speculative.py`) — draft + verify pour 2-3× latence
-- **Channels** (`channels/`) — Console, Telegram, Slack
-- **CLI Typer** (`cli/main.py`) — headless, pas d'UI
-
-### 3. UI supprimée
-- `server/static/` (HTML/CSS/JS) supprimé
-- `server/app.py` modifié : plus de StaticFiles ni d'index.html
-- Accès via CLI + API REST uniquement
+1. **Valider les sous-agents avec un vrai modèle** — remplacer le chemin mock par une exécution réelle, tester une mission multi-sections.
+2. **Exercer le cron** — vérifier le déclenchement de tâches planifiées en conditions réelles.
+3. **Recherche web fiable** — intégration Tavily/Serper de première classe, SearXNG local automatique.
+4. **Trancher le sort de la SDM** — soit ablation propre du prédictif, soit recâblage causal de la surprise dans la cascade de salience (boost N2 / assouplissement N3, jamais d'override du filtre anti-bruit N1).
+5. **Consolidation MHN -> Chroma** — durcir la promotion des souvenirs marquants.
+6. **Cascade cloud optionnelle** — chemin Claude/Gemini pour les cas où le modèle local plafonne.
 
 ---
 
 ## Tests
 
 ```bash
-# Tests des modules Rune (sans GPU)
-python -m pytest tests/test_memory.py tests/test_agents.py tests/test_backend.py tests/test_rune_integration.py -v
+# Suite complète
+python3 -m pytest tests/ -q
 
-# Tous les tests (inclut tests Lythea qui nécessitent torch)
-python -m pytest tests/ -v
+# 1485 tests au vert (couverture unitaire)
 ```
 
-63 tests couvrent : backend mock, working memory, tiered retriever, auto-skill,
-failure memory, surprise meter, metacognition, subagents, cron scheduler,
-et l'intégration RuneCortex (avec mock d'Hippocampe).
-
-Les tests Lythea originaux (~166 tests sans GPU) nécessitent torch et sont
-disponibles dans `tests/test_*.py` (66 fichiers).
+> Rappel : les tests unitaires ne remplacent pas la validation GPU. Plusieurs bugs réels (format d'events, sérialisation numpy, config de logging, entry point CLI) n'étaient visibles qu'à l'exécution sur matériel — d'où l'importance de la section État du projet.
 
 ---
 
-## Configuration
+## Lignage
 
-Rune réutilise la config Lythea (variables d'environnement avec préfixe
-`LYTHEA_`) + ajoute ses propres variables `HERMES_LYTHEA_` :
-
-| Variable | Défaut | Description |
-|---|---|---|
-| `LYTHEA_*` | (cf. `.env.example`) | Config Lythea originale |
-| `HERMES_LYTHEA_AUTH_TOKEN` | `` | Token d'auth API |
-| `HERMES_LYTHEA_TELEGRAM_TOKEN` | `` | Token bot Telegram |
-| `HERMES_LYTHEA_SLACK_APP_TOKEN` | `` | Token Slack Socket Mode |
-| `HERMES_LYTHEA_SLACK_BOT_TOKEN` | `` | Token bot Slack |
+Rune étend **Lythea** (assistant LLM local à cycle cognitif biomimétique) d'une couche agentique inspirée d'un harnais interne. Le cœur cognitif (mémoire, surprise, consolidation, RAG/CRAG, steering) vient de Lythea ; Rune y ajoute l'AutoSkill, les sous-agents, le cron et le mode headless.
 
 ---
 
-## Limitations honnêtes
-
-- **Backend transformers** : code présent mais non testé sur GPU dans ce sprint.
-  Sur un pod RunPod avec CUDA, `rune chat` doit fonctionner mais
-  demande validation.
-- **Tests Lythea originaux** : 66 fichiers de tests Lythea sont présents mais
-  nécessitent torch. À exécuter sur le pod.
-- **CLI `chat`** : nécessite le boot complet Hippocampe (model + SDM + MHN +
-  Chroma + KG). À tester sur GPU.
-- **Subagent runtime** : utilise MockBackend par défaut. Pour un vrai subagent
-  avec modèle, override `HERMES_SUBAGENT_BACKEND=transformers`.
-- **Steering CAA** : présent dans `steering/` mais non branché dans
-  `RuneCortex`. À connecter si besoin.
-
----
-
-## Roadmap
-
-### Court terme
-- Validation backend transformers sur GPU réel
-- Brancher steering CAA dans RuneCortex
-- Tests end-to-end avec vrai modèle sur pod RunPod
-
-### Moyen terme
-- MCP client complet (cf. BACKLOG Lythea V6)
-- Channels WhatsApp (Twilio), iMessage (BlueBubbles)
-- Streaming SSE vrai (TextIteratorStreamer)
-
-### Long terme
-- Auto-calibration des seuils métacognition par modèle
-- Multi-user (isolation mémoire par utilisateur)
-
----
-
-## Licence
-
-MIT — voir `LICENSE`.
-
-Inspiré de :
-- [Lythea](https://github.com/Benoth08/Lythea-Reasoning-Agent) v5.8 par Michaël Féré (42 000 lignes)
-- Le concept d'agent autonome avec auto-skill, subagents et cron (inspiration générale)
-- [OpenClaw](https://openclaw.ai/) pour le concept omnicanal
+*Projet en développement actif — les interfaces et le périmètre peuvent évoluer.*

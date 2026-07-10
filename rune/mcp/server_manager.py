@@ -7,7 +7,7 @@ tool name → schema), and dispatches calls to the right
 
 Public API
 ----------
-Single class :class:`MCPServerManager`. Created in :mod:`lythea.boot`,
+Single class :class:`MCPServerManager`. Created in :mod:`rune.boot`,
 stored on the FastAPI app as ``app.mcp_manager``. Used by hippocampe
 and routes via ``app.mcp_manager.<method>``.
 
@@ -33,7 +33,7 @@ from pathlib import Path
 from .client import MCPClient, MCPError
 from .prerequisites import check_node, log_status_or_instructions
 
-log = logging.getLogger("lythea.mcp.server_manager")
+log = logging.getLogger("rune.mcp.server_manager")
 
 
 @dataclass(frozen=True)

@@ -41,11 +41,13 @@ def mock_hippocampe():
         hippocampe.exchange_count += 1
         yield {
             "type": "done",
-            "text": f"Réponse à: {message}",
-            "doubt_index": 0.1,
-            "confidence_label": "très_certaine",
-            "web_used": False,
-            "kg_facts_count": 2,
+            "data": {
+                "text": f"Réponse à: {message}",
+                "doubt_index": 0.1,
+                "confidence_label": "très_certaine",
+                "web_used": False,
+                "kg_facts_count": 2,
+            },
         }
 
     hippocampe.process_message.side_effect = fake_process
@@ -85,7 +87,8 @@ def test_rune_process_message_delegates(rune, mock_hippocampe):
     # Au moins un event "done"
     done_events = [e for e in events if e.get("type") == "done"]
     assert len(done_events) >= 1
-    assert "Bonjour" in done_events[0]["text"]
+    # Le texte est dans event["data"]["text"] (format réel des events).
+    assert "Bonjour" in done_events[0]["data"]["text"]
     mock_hippocampe.process_message.assert_called_once()
 
 
@@ -144,11 +147,13 @@ def test_rune_post_generation_no_skill_on_low_confidence(rune, mock_hippocampe):
         mock_hippocampe.exchange_count += 1
         yield {
             "type": "done",
-            "text": "Réponse courte.",
-            "doubt_index": 0.7,
-            "confidence_label": "très_incertaine",
-            "web_used": False,
-            "kg_facts_count": 0,
+            "data": {
+                "text": "Réponse courte.",
+                "doubt_index": 0.7,
+                "confidence_label": "très_incertaine",
+                "web_used": False,
+                "kg_facts_count": 0,
+            },
         }
 
     mock_hippocampe.process_message.side_effect = low_conf_process
@@ -165,12 +170,14 @@ def test_rune_post_generation_extracts_skill_on_success(rune, mock_hippocampe, t
         mock_hippocampe.exchange_count += 1
         yield {
             "type": "done",
-            "text": "Voici une réponse suffisamment longue pour passer le filtre "
-                    "de l'extracteur heuristique de compétences.",
-            "doubt_index": 0.1,
-            "confidence_label": "très_certaine",
-            "web_used": False,
-            "kg_facts_count": 5,
+            "data": {
+                "text": "Voici une réponse suffisamment longue pour passer le filtre "
+                        "de l'extracteur heuristique de compétences.",
+                "doubt_index": 0.1,
+                "confidence_label": "très_certaine",
+                "web_used": False,
+                "kg_facts_count": 5,
+            },
         }
 
     mock_hippocampe.process_message.side_effect = success_process
@@ -194,11 +201,13 @@ def test_rune_skills_persistence(tmp_path, mock_hippocampe):
         mock_hippocampe.exchange_count += 1
         yield {
             "type": "done",
-            "text": "Réponse longue et détaillée pour l'extraction heuristique.",
-            "doubt_index": 0.1,
-            "confidence_label": "très_certaine",
-            "web_used": False,
-            "kg_facts_count": 5,
+            "data": {
+                "text": "Réponse longue et détaillée pour l'extraction heuristique.",
+                "doubt_index": 0.1,
+                "confidence_label": "très_certaine",
+                "web_used": False,
+                "kg_facts_count": 5,
+            },
         }
 
     mock_hippocampe.process_message.side_effect = success_process
@@ -232,11 +241,13 @@ def test_rune_failures_persistence(tmp_path, mock_hippocampe):
         mock_hippocampe.exchange_count += 1
         yield {
             "type": "done",
-            "text": "Réponse courte.",
-            "doubt_index": 0.8,
-            "confidence_label": "très_incertaine",
-            "web_used": False,
-            "kg_facts_count": 0,
+            "data": {
+                "text": "Réponse courte.",
+                "doubt_index": 0.8,
+                "confidence_label": "très_incertaine",
+                "web_used": False,
+                "kg_facts_count": 0,
+            },
         }
 
     mock_hippocampe.process_message.side_effect = failure_process

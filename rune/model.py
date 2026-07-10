@@ -21,7 +21,7 @@ from PIL import Image
 
 from rune.config import CATALOG, DEVICE, DTYPE, ModelSpec
 
-log = logging.getLogger("lythea.model")
+log = logging.getLogger("rune.model")
 
 
 # ── V5.6.8 — Helper config multimodal compatibility ────────────────────
@@ -958,7 +958,7 @@ class HFModelWrapper(ModelWrapper):
         mirroring the spec:
 
           - ``is_thinking=True``  → ``True``  → ``<think>`` appears and is
-            extracted by :func:`lythea.cognition.generation.strip_reasoning`;
+            extracted by :func:`rune.cognition.generation.strip_reasoning`;
           - ``is_thinking=False`` → ``False`` → reasoning suppressed.
 
         Templates that don't know the kwarg (Qwen2.5, Mistral, Phi…)
@@ -1389,7 +1389,7 @@ class HFModelWrapper(ModelWrapper):
         cancelled
             Optional event to interrupt streaming early.
         sampling
-            Optional :class:`lythea.config.SamplingProfile` describing
+            Optional :class:`rune.config.SamplingProfile` describing
             the model's recommended sampling parameters. If ``None``,
             falls back to legacy hardcoded defaults (T=0.7, top_p=0.9).
         pil_images

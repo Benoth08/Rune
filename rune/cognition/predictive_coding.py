@@ -43,7 +43,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Sequence
 
-log = logging.getLogger("lythea.cognition.predictive_coding")
+log = logging.getLogger("rune.cognition.predictive_coding")
 
 
 # ── Constants ────────────────────────────────────────────────────────

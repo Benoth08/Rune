@@ -14,7 +14,7 @@ import importlib.util
 import pytest
 
 # Tous les tests de ce fichier nécessitent torch (chargé par
-# lythea.cognition.encoding). Skip global en sandbox sans torch.
+# rune.cognition.encoding). Skip global en sandbox sans torch.
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("torch") is None,
     reason="encoding.py requires torch",

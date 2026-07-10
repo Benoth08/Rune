@@ -43,7 +43,7 @@ from typing import Any
 
 import torch
 
-log = logging.getLogger("lythea.cognition.storage")
+log = logging.getLogger("rune.cognition.storage")
 
 
 # Mapping from co-occurring entity type → predicate, for auto-relations
@@ -124,7 +124,7 @@ class StoragePhase:
         ----------
         latents
             Per-token hidden states from
-            :class:`~lythea.cognition.encoding.EncodingResult`.
+            :class:`~rune.cognition.encoding.EncodingResult`.
             ``None`` → SDM write skipped.
         token_entropies
             Per-token entropies aligned with ``latents``. ``None`` →
@@ -372,6 +372,10 @@ class StoragePhase:
                     "epistemic": epistemic,
                     "surprise": surprise.get("global", 0),
                     "atoms_count": atoms_count,
+                    # V5.9 rétention : created_ts figé à l'écriture,
+                    # last_access_ts rafraîchi à chaque rappel (retrieval).
+                    "created_ts": time.time(),
+                    "last_access_ts": time.time(),
                 }],
             )
             return True

@@ -1,4 +1,4 @@
-"""Unit tests for :class:`lythea.cognition.retrieval.RetrievalPhase`.
+"""Unit tests for :class:`rune.cognition.retrieval.RetrievalPhase`.
 
 Mocks the four backends. The KG mock matches the public surface of
 :class:`KnowledgeGraphStore` (``entities`` dict, ``relations`` dict,

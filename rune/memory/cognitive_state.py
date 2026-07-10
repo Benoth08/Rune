@@ -54,7 +54,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
-log = logging.getLogger("lythea.memory.cognitive_state")
+log = logging.getLogger("rune.memory.cognitive_state")
 
 
 # ── Constants ────────────────────────────────────────────────────────

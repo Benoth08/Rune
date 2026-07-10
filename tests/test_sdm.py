@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-torch = pytest.importorskip("torch")  # skipped in the torch-free sandbox
+try:
+    import torch
+except (ImportError, OSError):
+    pytest.skip("torch not available or broken CUDA", allow_module_level=True)
 
 
 def test_sdm_addresses_persist_across_reload(tmp_path):

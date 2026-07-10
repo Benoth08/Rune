@@ -11,7 +11,7 @@ import pytest
 torch_available = True
 try:
     import torch  # noqa: F401
-except ImportError:
+except (ImportError, OSError):
     torch_available = False
 
 from rune.boot import STAGES, BootRunner, BootState
@@ -85,7 +85,7 @@ def test_runner_handles_chromadb_failure_gracefully(monkeypatch):
 
     # Bypass VRAM detection
     monkeypatch.setattr(
-        "lythea.model.vram_free_gb", lambda: 0.0,
+        "rune.model.vram_free_gb", lambda: 0.0,
     )
 
     runner = BootRunner(fake_app, state)
@@ -113,7 +113,7 @@ def test_runner_picks_blip_when_low_vram(monkeypatch):
         return {"status": "loaded", "backend": choice}
     fake_app.hippocampe.captioner.select.side_effect = fake_select
 
-    monkeypatch.setattr("lythea.model.vram_free_gb", lambda: 2.0)
+    monkeypatch.setattr("rune.model.vram_free_gb", lambda: 2.0)
 
     runner = BootRunner(fake_app, state)
     runner._run()
@@ -141,7 +141,7 @@ def test_runner_tries_qwen2vl_when_high_vram(monkeypatch):
         return {"status": "loaded", "backend": choice}
     fake_app.hippocampe.captioner.select.side_effect = fake_select
 
-    monkeypatch.setattr("lythea.model.vram_free_gb", lambda: 18.0)
+    monkeypatch.setattr("rune.model.vram_free_gb", lambda: 18.0)
 
     runner = BootRunner(fake_app, state)
     runner._run()

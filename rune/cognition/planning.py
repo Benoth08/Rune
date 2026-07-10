@@ -55,7 +55,7 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Callable
 
-log = logging.getLogger("lythea.cognition.planning")
+log = logging.getLogger("rune.cognition.planning")
 
 
 # ── Constants ────────────────────────────────────────────────────────

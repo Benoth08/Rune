@@ -236,7 +236,7 @@ class SubAgentSpawner:
                     if "proxy" in k.lower():
                         del env[k]
             env.update(self.config.env_overrides)
-            env["HERMES_SUBAGENT_MODE"] = "1"
+            env["RUNE_SUBAGENT_MODE"] = "1"
 
             # Lance le subprocess
             proc = subprocess.Popen(

@@ -26,7 +26,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any
 
-log = logging.getLogger("lythea.cognition.vision_semantic")
+log = logging.getLogger("rune.cognition.vision_semantic")
 
 
 # ──────────────────────────────────────────────────────────────────────

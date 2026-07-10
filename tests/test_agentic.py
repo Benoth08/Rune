@@ -41,7 +41,7 @@ def _pool():
 
 # ── Worker pool routing ───────────────────────────────────────────────
 def test_pool_needs_prefix_routes_to_core():
-    assert _pool().pick(needs_prefix=True).name == "taelys-core"
+    assert _pool().pick(needs_prefix=True).name == "rune-core"
 
 
 def test_pool_prefers_available_auxiliary():
@@ -67,7 +67,7 @@ def test_pool_falls_back_to_core_when_aux_unavailable():
             return "aux"
 
     pool = WorkerPool(core=InProcessWorker(model=_FakeModel()), auxiliaries=[Aux()])
-    assert pool.pick(needs_prefix=False).name == "taelys-core"
+    assert pool.pick(needs_prefix=False).name == "rune-core"
 
 
 # ── Parsing helpers ───────────────────────────────────────────────────
@@ -1060,7 +1060,7 @@ def test_tool_call_survives_unclosed_think():
 
 def test_runaway_guards_constants_present():
     """Audit anti-emballement : les bornes clés existent dans l'orchestrateur."""
-    src = open("lythea/agentic/orchestrator.py", encoding="utf-8").read()
+    src = open("rune/agentic/orchestrator.py", encoding="utf-8").read()
     # caps d'appels d'outils
     assert "_WEB_CALL_MAX" in src           # web spam
     assert "_REPEAT_CALL_MAX" in src        # même appel répété (tous outils)
@@ -1093,7 +1093,7 @@ def test_focus_failing_case_empty_on_green():
 
 
 def test_decompose_escalation_wired():
-    src = open("lythea/agentic/orchestrator.py", encoding="utf-8").read()
+    src = open("rune/agentic/orchestrator.py", encoding="utf-8").read()
     assert "did_decompose" in src
     assert "progress.stalled >= progress.DECOMPOSE" in src  # palier généraliste
     assert "_focus_failing_case" in src

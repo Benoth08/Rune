@@ -30,7 +30,7 @@ info()  { echo -e "${BLUE}  →${NC} $1"; }
 
 echo ""
 echo "============================================================"
-echo "  Lythéa — Déploiement"
+echo "  Rune — Déploiement"
 echo "============================================================"
 echo ""
 
@@ -124,6 +124,12 @@ done
 # compagnons non-torch sont posés normalement.
 echo "    → Cœur ML (transformers, accelerate, gliner…) en --no-deps (torch préservé)…"
 # Compagnons SANS torch (sûrs en deps complètes)
+# --ignore-installed sur typer : certaines images de pod embarquent un typer
+# sans fichier RECORD, ce qui fait échouer toute tentative de mise à jour
+# ("Cannot uninstall typer None: no RECORD file"). --ignore-installed pose la
+# nouvelle version par-dessus sans désinstaller l'ancienne (bénin ici : typer
+# est une petite lib CLI sans état partagé).
+pip3 install $PIP_FLAGS --quiet --ignore-installed typer 2>&1 | grep -v "^WARNING\|^\[notice" || true
 pip3 install $PIP_FLAGS --quiet \
     "huggingface_hub>=0.24" "tokenizers>=0.22.0,<=0.23.0" regex safetensors einops timm \
     "sse-starlette>=2.0" "rank-bm25>=0.2" ddgs \
@@ -186,6 +192,24 @@ info "Autres deps ML (gliner, transformers…) : vérifiées par run.py au boot.
 
 echo ""
 
+# ── Installation du package Rune (crée la commande `rune`) ────────────
+# Sans ça, `rune chat` donne "command not found" : l'entry point défini
+# dans pyproject.toml ([project.scripts] rune = ...) n'existe pas tant
+# que le package n'est pas installé. --no-deps pour ne PAS toucher torch
+# ni retélécharger les deps déjà posées ci-dessus.
+echo "🔧 Installation de la commande 'rune' (pip install -e . --no-deps)…"
+if pip3 install $PIP_FLAGS --no-deps --quiet -e . 2>&1 | grep -v "^WARNING\|^\[notice"; then
+    :
+fi
+if command -v rune &>/dev/null; then
+    ok "Commande 'rune' disponible ($(command -v rune))"
+else
+    warn "Commande 'rune' non trouvée dans le PATH après install."
+    info "  Repli : utilise [cyan]python3 -m rune.cli <commande>[/] (ex: python3 -m rune.cli chat)"
+fi
+
+echo ""
+
 # ── 5. Configuration .env ─────────────────────────────────────────────
 
 echo "4️⃣  Configuration de l'environnement…"
@@ -235,16 +259,15 @@ echo ""
 echo "6️⃣  Vérification de la structure…"
 
 REQUIRED_FILES=(
-    "lythea/settings.py"
-    "lythea/boot.py"
-    "lythea/cache.py"
-    "lythea/temporal.py"
-    "lythea/microsleep.py"
-    "lythea/soft_memory.py"
-    "lythea/server/auth.py"
-    "lythea/server/rate_limit.py"
-    "lythea/server/app.py"
-    "lythea/server/static/index.html"
+    "rune/settings.py"
+    "rune/boot.py"
+    "rune/cache.py"
+    "rune/temporal.py"
+    "rune/microsleep.py"
+    "rune/soft_memory.py"
+    "rune/server/auth.py"
+    "rune/server/rate_limit.py"
+    "rune/server/app.py"
     "run.py"
 )
 
@@ -267,8 +290,12 @@ echo ""
 
 echo "7️⃣  Vérification syntaxe Python…"
 SYNTAX_ERRORS=0
-for f in $(find lythea/ -name "*.py" -not -path "*/__pycache__/*"); do
-    if ! python3 -c "import ast; ast.parse(open('$f').read())" 2>/dev/null; then
+for f in $(find rune/ -name "*.py" -not -path "*/__pycache__/*"); do
+    # encoding='utf-8' explicite : sur un pod dont la locale n'est pas
+    # UTF-8, open() par défaut pourrait choisir ASCII et lever une
+    # UnicodeDecodeError sur les accents français, faussement comptée
+    # comme erreur de syntaxe.
+    if ! python3 -c "import ast; ast.parse(open('$f', encoding='utf-8').read())" 2>/dev/null; then
         err "Erreur de syntaxe dans $f"
         SYNTAX_ERRORS=$((SYNTAX_ERRORS + 1))
     fi

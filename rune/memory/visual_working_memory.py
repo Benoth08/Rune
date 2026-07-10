@@ -23,7 +23,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-log = logging.getLogger("lythea.visual_working_memory")
+log = logging.getLogger("rune.visual_working_memory")
 
 
 # ──────────────────────────────────────────────────────────────────────

@@ -46,7 +46,7 @@ import urllib.request
 
 from rune.web_providers.base import SearchResult
 
-log = logging.getLogger("lythea.web_providers.tavily")
+log = logging.getLogger("rune.web_providers.tavily")
 
 
 # Tavily's official search endpoint.

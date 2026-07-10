@@ -30,7 +30,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-log = logging.getLogger("lythea.cognition.graph_communities")
+log = logging.getLogger("rune.cognition.graph_communities")
 
 
 # ── Community dataclass ───────────────────────────────────────────────

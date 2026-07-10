@@ -8,7 +8,7 @@ import pytest
 torch_available = True
 try:
     import torch  # noqa: F401
-except ImportError:
+except (ImportError, OSError):
     torch_available = False
 
 pytestmark = pytest.mark.skipif(not torch_available, reason="torch not installed")
@@ -16,10 +16,10 @@ pytestmark = pytest.mark.skipif(not torch_available, reason="torch not installed
 
 def _setup_vram(monkeypatch, free_gb: float, total_gb: float = 24.0):
     """Patch VRAM helpers to predictable values."""
-    monkeypatch.setattr("lythea.model.vram_free_gb", lambda: free_gb)
-    monkeypatch.setattr("lythea.model.vram_total_gb", lambda: total_gb)
+    monkeypatch.setattr("rune.model.vram_free_gb", lambda: free_gb)
+    monkeypatch.setattr("rune.model.vram_total_gb", lambda: total_gb)
     # DEVICE override — must patch the symbol where it's used (model.py)
-    monkeypatch.setattr("lythea.model.DEVICE", "cuda")
+    monkeypatch.setattr("rune.model.DEVICE", "cuda")
 
 
 def test_loadable_when_enough_vram(monkeypatch):
@@ -91,7 +91,7 @@ def test_truly_too_big_for_gpu(monkeypatch):
 
 def test_cpu_mode_always_loadable(monkeypatch):
     from rune.model import model_loadability_info
-    monkeypatch.setattr("lythea.model.DEVICE", "cpu")
+    monkeypatch.setattr("rune.model.DEVICE", "cpu")
 
     info = model_loadability_info("Qwen/Qwen2.5-7B-Instruct")
     assert info["loadable"] is True

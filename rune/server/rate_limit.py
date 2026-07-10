@@ -29,7 +29,7 @@ from slowapi.errors import RateLimitExceeded
 
 from rune.server.auth import _is_loopback
 
-log = logging.getLogger("lythea.server.rate_limit")
+log = logging.getLogger("rune.server.rate_limit")
 
 
 def _get_client_ip(request: Request) -> str:

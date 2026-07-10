@@ -14,7 +14,7 @@ import logging
 import os
 from dataclasses import dataclass
 
-log = logging.getLogger("lythea.hwprofile")
+log = logging.getLogger("rune.hwprofile")
 
 
 @dataclass(frozen=True)

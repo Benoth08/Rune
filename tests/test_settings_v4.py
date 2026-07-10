@@ -112,7 +112,7 @@ def test_affect_decay_300s():
 
 
 def test_affect_contagion_strictly_below_one():
-    """ANTI-SYCOPHANT: contagion cap <1 prevents Lythéa from mirroring."""
+    """ANTI-SYCOPHANT: contagion cap <1 prevents Rune from mirroring."""
     s = LytheaSettings()
     assert 0.0 <= s.affect_contagion_max < 1.0
     # Stronger: anything ≥ 0.5 starts to feel sycophantic

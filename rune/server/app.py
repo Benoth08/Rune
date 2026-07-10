@@ -86,6 +86,25 @@ class LytheaApp:
         self.sdm.load_state(sdm_path)
         self.mhn.load_state(mhn_path)
 
+        # Rune — Wrap Hippocampe avec RuneCortex pour activer AutoSkill,
+        # FailureMemory, TieredRetriever, et tous les hooks Rune.
+        # Sans ça, l'API Lythea appelle hippocampe.process_message()
+        # directement et les extensions Rune ne tournent jamais.
+        self.rune_cortex: Any = None
+        try:
+            from rune.cortex_ext.integration import RuneCortex
+            self.rune_cortex = RuneCortex(self.hippocampe)
+            # Monkey-patch : remplace hippocampe.process_message par la
+            # version wrappée qui ajoute AutoSkill/FailureMemory hooks.
+            # Toutes les routes Lythea qui appellent
+            # hippocampe.process_message() passent maintenant par RuneCortex.
+            original_process = self.hippocampe.process_message
+            self.rune_cortex._original_process = original_process
+            self.hippocampe.process_message = self.rune_cortex.process_message
+            log.info("RuneCortex wrapped — AutoSkill/FailureMemory active")
+        except Exception as exc:
+            log.warning("RuneCortex init failed: %s — Rune extensions disabled", exc)
+
         # Soft memory (opt-in). When disabled, attribute is None and
         # the /api/soft-memory/* endpoints return 503 with a clear
         # message. See lythea/soft_memory.py for the design rationale.
@@ -219,7 +238,7 @@ async def lifespan(app: FastAPI):
 
     # Passerelle Telegram (optionnelle) : démarre si un token est configuré.
     # Long-polling sortant — aucun port à ouvrir ; le navigateur devient
-    # facultatif (voir aussi le mode standalone `python -m lythea.telegram_bot`).
+    # facultatif (voir aussi le mode standalone `python -m rune.telegram_bot`).
     try:
         from rune.telegram_bot import start_if_configured
         app.state.telegram = start_if_configured(app.state.lythea,
@@ -303,11 +322,22 @@ def create_app() -> FastAPI:
     app.add_middleware(SlowAPIMiddleware)
 
     # ── Auth (added LAST → runs FIRST) ────────────────────────────────
+    # "/" est public : c'est le message d'accueil headless. Sans ça, un
+    # accès au tunnel Cloudflare exigerait un token et renverrait 401 au
+    # lieu du message d'accueil. "/docs" et "/openapi.json" sont aussi
+    # publics pour que la doc interactive soit consultable.
     app.add_middleware(
         AuthMiddleware,
         expected_token=settings.auth_token,
         strict=settings.auth_strict,
-        public_paths={"/api/boot/status", "/api/health"},
+        public_paths={
+            "/",
+            "/api/boot/status",
+            "/api/health",
+            "/docs",
+            "/openapi.json",
+            "/redoc",
+        },
     )
 
     app.include_router(router)

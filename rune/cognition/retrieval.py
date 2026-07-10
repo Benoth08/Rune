@@ -54,7 +54,7 @@ from typing import Any
 
 from rune.temporal import annotate_with_freshness, humanise_delta
 
-log = logging.getLogger("lythea.cognition.retrieval")
+log = logging.getLogger("rune.cognition.retrieval")
 
 
 # Section separator inside the [Mémoire contextuelle] prompt block.
@@ -435,7 +435,7 @@ class RetrievalPhase:
 
         V5.2 — Corrective RAG (CRAG) integration. After the initial
         hybrid search + rerank, we evaluate retrieval quality via
-        :func:`lythea.cognition.crag.evaluate_and_rescue`. The result
+        :func:`rune.cognition.crag.evaluate_and_rescue`. The result
         is a CRAGVerdict with status (CORRECT/AMBIGUOUS/INCORRECT/
         EMPTY) that drives both the chunk selection (rescued if
         AMBIGUOUS and rewrite improved scores) and the cognitive
@@ -488,6 +488,28 @@ class RetrievalPhase:
 
         if not results:
             return
+
+        # V5.9 — rétention : un souvenir rappelé se protège de l'oubli.
+        # On rafraîchit last_access_ts sur les chunks EFFECTIVEMENT injectés
+        # (après CRAG, donc l'ensemble final réellement utilisé — pas les
+        # résultats bruts qui pourraient être remplacés/rescués). Best-
+        # effort : ne bloque jamais le rappel ; on renvoie la métadonnée
+        # complète pour ne rien écraser.
+        try:
+            _now = time.time()
+            _ids, _metas = [], []
+            for _r in results:
+                _rid = _r.get("id")
+                if not _rid:
+                    continue
+                _m = dict(_r.get("metadata") or {})
+                _m["last_access_ts"] = _now
+                _ids.append(_rid)
+                _metas.append(_m)
+            if _ids:
+                self.hybrid_retriever.collection.update(ids=_ids, metadatas=_metas)
+        except Exception as exc:  # pragma: no cover — best-effort
+            log.warning("last_access refresh failed: %s", exc)
 
         # V5.6 — Ne pas annoncer "j'ai trouvé des souvenirs pertinents" si
         # CRAG a déjà émis un verdict : INCORRECT produirait deux pensées

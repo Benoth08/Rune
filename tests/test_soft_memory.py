@@ -10,7 +10,7 @@ import pytest
 torch_available = True
 try:
     import torch
-except ImportError:
+except (ImportError, OSError):
     torch_available = False
 
 from rune.soft_memory import SoftMemoryConfig

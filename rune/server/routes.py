@@ -36,7 +36,7 @@ from rune.server.schemas import (
 )
 from rune.sessions import Message
 
-log = logging.getLogger("lythea.server.routes")
+log = logging.getLogger("rune.server.routes")
 
 router = APIRouter()
 
@@ -55,6 +55,33 @@ _limit_model_load = make_limit_decorator(_settings.rate_limit_model_load)
 def _lythea(request: Request) -> Any:
     """Get the Lythea app state."""
     return request.app.state.lythea
+
+
+# ── Racine (mode headless — pas d'UI, juste un message d'accueil) ──────
+# Sans cette route, ouvrir l'URL du tunnel affiche {"detail":"Not Found"}
+# (404), ce qui est déroutant. On renvoie un petit message JSON qui
+# pointe vers les endpoints utiles au lieu d'un 404 sec.
+
+@router.get("/")
+async def root() -> dict:
+    """Message d'accueil — Rune est headless (pas d'interface web)."""
+    return {
+        "service": "Rune",
+        "status": "running",
+        "headless": True,
+        "message": (
+            "Rune est un agent headless (pas d'interface web). "
+            "Utilise l'API ou la CLI."
+        ),
+        "endpoints": {
+            "health": "/api/health",
+            "boot_status": "/api/boot/status",
+            "docs": "/docs",
+            "chat": "POST /api/chat",
+            "models": "/api/models",
+            "load_model": "POST /api/models/load",
+        },
+    }
 
 
 # ── Boot status (always available, even during boot) ──────────────────
@@ -135,7 +162,7 @@ async def memory_health(request: Request) -> dict:
         # Pas de 500 — on retourne un payload neutre que la UI peut afficher.
         # On log avec stacktrace complète pour faciliter le debug.
         import logging
-        logging.getLogger("lythea.server.routes").exception(
+        logging.getLogger("rune.server.routes").exception(
             "Memory health computation failed",
         )
         from fastapi.responses import JSONResponse
@@ -2464,7 +2491,7 @@ async def workspace_ingest(request: Request) -> dict:
 # Rune emits one fenced block per file (marqueur « # file: chemin »).
 # These routes turn the raw answer Markdown into individual downloads,
 # a project .zip, or files written into the workspace sandbox. Parsing
-# is centralised in lythea.server.codegen (single source of truth).
+# is centralised in rune.server.codegen (single source of truth).
 
 @router.post("/api/codegen/extract")
 async def codegen_extract(body: CodegenRequest, request: Request) -> dict:
@@ -2489,7 +2516,7 @@ async def codegen_zip(body: CodegenRequest, request: Request) -> StreamingRespon
         )
     blob = build_zip(files)
     headers = {
-        "Content-Disposition": "attachment; filename*=UTF-8''projet-lythea.zip",
+        "Content-Disposition": "attachment; filename*=UTF-8''projet-rune.zip",
         "Content-Length": str(len(blob)),
     }
     return StreamingResponse(

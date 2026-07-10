@@ -47,7 +47,7 @@ import urllib.request
 
 from rune.web_providers.base import SearchResult
 
-log = logging.getLogger("lythea.web_providers.serper")
+log = logging.getLogger("rune.web_providers.serper")
 
 
 # Serper's official search endpoint.

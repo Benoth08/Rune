@@ -34,7 +34,7 @@ import time
 from dataclasses import asdict, dataclass
 from typing import Any
 
-log = logging.getLogger("lythea.memory.health")
+log = logging.getLogger("rune.memory.health")
 
 
 # ── Dataclass de sortie ────────────────────────────────────────────────

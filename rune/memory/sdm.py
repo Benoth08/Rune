@@ -13,7 +13,7 @@ import torch
 
 from rune.config import SDM_DECAY, SDM_DIM, SDM_K, SDM_PRUNE_THRESHOLD, SDM_ROWS
 
-log = logging.getLogger("lythea.memory.sdm")
+log = logging.getLogger("rune.memory.sdm")
 
 _ADDR_SEED = 1_234_567  # deterministic seed for the bipolar address matrix
 
@@ -263,3 +263,9 @@ class SparseDistributedMemory:
     def bundle(*vectors: torch.Tensor) -> torch.Tensor:
         """Majority-rule bundling (signed sum)."""
         return torch.sign(sum(vectors))
+
+
+# Alias rétrocompatible. L'API historique Lythea exposait la classe sous
+# le nom court ``SDM`` ; certains modules et tests l'importent encore ainsi.
+# On garde l'alias pour ne pas casser ces imports.
+SDM = SparseDistributedMemory

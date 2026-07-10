@@ -54,7 +54,7 @@ def test_deliberate_trivial_is_empty():
 
 def test_orchestrator_wires_deliberation_conditionally():
     """Le multi-angles est branché pour non-thinking, l'inline préservé."""
-    src = open("lythea/agentic/orchestrator.py", encoding="utf-8").read()
+    src = open("rune/agentic/orchestrator.py", encoding="utf-8").read()
     # le module est bien importé/utilisé
     assert "DeliberativeReasoner" in src
     # conditionné au NON-thinking

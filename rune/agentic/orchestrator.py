@@ -1,7 +1,7 @@
 """Agent orchestrator — the "hippocampe agentique", sibling of the chat.
 
 V6 Phase 1. This class does NOT subclass or modify the chat
-:class:`~lythea.hippocampe.Hippocampe`. It *composes* it: it borrows the
+:class:`~rune.hippocampe.Hippocampe`. It *composes* it: it borrows the
 shared model and memory (by reference, so the agent writes into the same
 consolidating memory as the chat) and adds a bounded plan → act →
 critique loop on top, routed over a :class:`WorkerPool`.
@@ -1104,7 +1104,7 @@ class AgentOrchestrator:
         """Write user-provided files into the mission dir so the agent's
         read_file / list_files (scoped to ``missions/<slug>/``) can see them.
 
-        Uses the SHARED ingestion (``lythea.agentic.ingest``) — the same
+        Uses the SHARED ingestion (``rune.agentic.ingest``) — the same
         captioner-vs-native-pixels decision as the chat: docs → extracted
         text; images → caption text if the brain is text-only, or kept as
         native pixels if the loaded model is multimodal (Gemma 4…).

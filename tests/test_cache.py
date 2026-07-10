@@ -155,8 +155,8 @@ def test_key_is_deterministic():
 
 def test_key_handles_unicode():
     """French accents should hash without errors."""
-    k1 = BoundedCache._key("Taëlys")
-    k2 = BoundedCache._key("Taelys")
+    k1 = BoundedCache._key("Café crème")
+    k2 = BoundedCache._key("cafe creme")
     assert k1 != k2  # they're different strings
     assert isinstance(k1, str)
 

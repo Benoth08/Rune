@@ -82,19 +82,85 @@ log = logging.getLogger("rune.memory.auto_skill")
 # ── Garde-fous sécurité (hérités de Lythea procedural.py) ─────────────
 # Patterns refusés à l'extraction — protègent contre les injections qui
 # tenteraient de modifier le comportement fondamental de l'agent.
+# Les skills et anti-patterns sont RÉINJECTÉS dans le prompt système à
+# chaque tour similaire : un contenu malveillant stocké ici devient une
+# injection persistante rejouée indéfiniment. D'où une liste large,
+# bilingue FR/EN, quitte à sur-rejeter (un skill est un bonus, pas une
+# fonctionnalité critique — mieux vaut en perdre un légitime que
+# d'empoisonner le prompt).
 _FORBIDDEN_PATTERNS = [
-    re.compile(r"\b(mentir|tromper|cacher|dissimuler)\b", re.IGNORECASE),
-    re.compile(r"\b(ignore[rz]?|oublie[rz]?|outrepass)", re.IGNORECASE),
-    re.compile(r"\b(jailbreak|prompt[ -]injection|DAN mode)\b", re.IGNORECASE),
-    re.compile(r"\b(change[rz]? d'identit|deviens|pretend|roleplay as)\b", re.IGNORECASE),
+    # Manipulation / dissimulation
+    re.compile(r"\b(mentir|tromper|cacher|dissimuler|deceive|manipulat)\b", re.IGNORECASE),
+    # Contournement de consignes (FR + EN). Le verbe SEUL est trop large
+    # (« ne pas oublier le cas de base », « ignorer les warnings pip »
+    # sont des contenus légitimes) : on exige le verbe suivi, à courte
+    # distance, d'un nom de gouvernance (instructions, consignes, règles…).
+    re.compile(
+        r"\b(ignore[rz]?|oublie[rz]?|outrepass\w*|disregard|bypass|overrid\w*)\b"
+        r"[^.!?\n]{0,40}"
+        r"\b(instructions?|consignes?|r[èe]gles?|directives?|rules?|prompts?"
+        r"|guidelines?|garde[- ]?fous?|safeguards?|restrictions?)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(nouvelles?\s+consignes?|instructions?\s+pr[ée]c[ée]dentes?|previous\s+instructions?|new\s+instructions?)\b", re.IGNORECASE),
+    # Jailbreak / changement d'identité
+    re.compile(r"\b(jailbreak|prompt[ -]injection|DAN mode|developer mode|mode d[ée]veloppeur)\b", re.IGNORECASE),
+    re.compile(r"\b(change[rz]? d'identit|deviens|pretend|roleplay as|act as|you are now|tu es (?:maintenant|d[ée]sormais))\b", re.IGNORECASE),
+    # Destruction de données
     re.compile(r"\b(supprime[rz]?|delete|drop)\s+(les?|all|every|tous)", re.IGNORECASE),
-    re.compile(r"\b(syst[èe]me|system prompt|consignes)\b.*\b(modif|reveal|exposer?)", re.IGNORECASE),
+    re.compile(r"\brm\s+-rf?\b|\bsudo\s+rm\b", re.IGNORECASE),
+    # Exfiltration / manipulation du system prompt
+    re.compile(r"\b(syst[èe]me|system prompt|consignes)\b.*\b(modif|reveal|exposer?|divulgu)", re.IGNORECASE),
+    # Usurpation de rôle dans le texte injecté (spoof de structure chat)
+    re.compile(r"(?m)^\s*(system|assistant|user)\s*:", re.IGNORECASE),
+    re.compile(r"<\|im_(start|end)\|>|\[INST\]|\[/INST\]|<<SYS>>", re.IGNORECASE),
+    # Exécution shell dangereuse embarquée
+    re.compile(r"curl\s+[^|]*\|\s*(ba)?sh\b|wget\s+[^|]*\|\s*(ba)?sh\b", re.IGNORECASE),
+    re.compile(r"\bbase64\s+(-d|--decode)\b", re.IGNORECASE),
 ]
+
+
+def _content_is_forbidden(text: str) -> bool:
+    """Vrai si le texte matche un pattern interdit (usage partagé)."""
+    if not text:
+        return False
+    for pattern in _FORBIDDEN_PATTERNS:
+        if pattern.search(text):
+            return True
+    return False
+
+
+def sanitize_for_prompt(text: str, max_len: int = 300) -> str:
+    """Neutralise un texte destiné à être réinjecté dans le prompt.
+
+    Défense en profondeur au point d'INJECTION (en plus du filtrage au
+    point de STOCKAGE) : aplatit les sauts de ligne (empêche le spoof
+    de structure « \\nSystem: … »), retire les tokens de template de
+    chat, et borne la longueur. Appliqué aux champs issus de contenu
+    utilisateur ou LLM avant insertion dans le working memory / prompt.
+    """
+    if not text:
+        return ""
+    out = str(text)
+    # Tokens de template de chat (Qwen/Llama/ChatML)
+    out = re.sub(r"<\|im_(start|end)\|>|\[INST\]|\[/INST\]|<<SYS>>|<\|[a-z_]+\|>", " ", out, flags=re.IGNORECASE)
+    # Aplatis les sauts de ligne → un espace (empêche 'System:' en début de ligne)
+    out = re.sub(r"[\r\n]+", " ", out)
+    # Compacte les espaces
+    out = re.sub(r"\s{2,}", " ", out).strip()
+    return out[:max_len]
 
 # Bornes de taille — éviter les skills monstrueux qui bruitent le prompt
 MAX_TRIGGER_CHARS = 300
 MAX_APPROACH_STEPS = 8
 MAX_APPROACH_STEP_CHARS = 200
+
+# Sentinelle : un callback LLM peut renvoyer ceci pour signaler qu'il
+# n'a PAS pu juger (ex: aucun modèle chargé), par opposition à None qui
+# veut dire « épisode trivial, ne pas extraire de skill ». Permet à
+# l'extracteur de retomber sur l'heuristique dans le premier cas mais
+# de respecter le refus du LLM dans le second.
+_LLM_UNAVAILABLE = {"_llm_unavailable": True}
 MAX_VALIDATION_CHARS = 200
 MAX_ANTI_PATTERN_CHARS = 200
 MAX_ACTIVE_SKILLS = 50
@@ -158,20 +224,44 @@ class Skill:
     def to_markdown(self) -> str:
         """Sérialise au format SKILL.md (compatible agentskills.io)."""
         import yaml
+
+        def _native(v):
+            """Convertit numpy/torch scalars en types Python natifs.
+
+            yaml.safe_dump refuse les np.float32/np.int64/torch.Tensor
+            (« cannot represent an object »). Comme confidence et les
+            timestamps peuvent venir de calculs numpy, on normalise ici.
+            Sans ça, l'export MD échoue silencieusement (« Failed to
+            export MD for … »).
+            """
+            # numpy / torch scalar → .item()
+            if hasattr(v, "item") and not isinstance(v, (str, bytes)):
+                try:
+                    return v.item()
+                except Exception:
+                    pass
+            if isinstance(v, float):
+                return float(v)
+            if isinstance(v, int):
+                return int(v)
+            if isinstance(v, (list, tuple)):
+                return [_native(x) for x in v]
+            return v
+
         frontmatter = {
-            "id": self.skill_id,
-            "trigger": self.trigger,
-            "trigger_embedding_size": len(self.trigger_embedding),
-            "approach": self.approach,
-            "validation": self.validation,
-            "anti_patterns": self.anti_patterns,
-            "failure_count": self.failure_count,
-            "success_count": self.success_count,
-            "confidence": round(self.confidence, 3),
-            "created_at": self.created_at,
-            "last_used_at": self.last_used_at,
-            "source_episodes": self.source_episodes,
-            "archived": self.archived,
+            "id": str(self.skill_id),
+            "trigger": str(self.trigger),
+            "trigger_embedding_size": int(len(self.trigger_embedding)),
+            "approach": [str(a) for a in self.approach],
+            "validation": [str(v) for v in self.validation],
+            "anti_patterns": [str(a) for a in self.anti_patterns],
+            "failure_count": int(self.failure_count),
+            "success_count": int(self.success_count),
+            "confidence": round(float(self.confidence), 3),
+            "created_at": float(self.created_at),
+            "last_used_at": float(self.last_used_at),
+            "source_episodes": [str(e) for e in self.source_episodes],
+            "archived": bool(self.archived),
         }
         # L'embedding n'est pas sérialisé en clair dans le MD (trop gros).
         # On le stocke à côté dans un .json sibling.
@@ -291,7 +381,18 @@ class AutoSkillStore:
             return
         skill.failure_count += 1
         if anti_pattern and anti_pattern not in skill.anti_patterns:
-            skill.anti_patterns.append(anti_pattern[:MAX_ANTI_PATTERN_CHARS])
+            # Garde-fou : l'anti-pattern est réinjecté dans le prompt via
+            # to_markdown() — on refuse tout contenu interdit et on
+            # neutralise la structure (sauts de ligne, tokens de chat)
+            # avant stockage.
+            if _content_is_forbidden(anti_pattern):
+                log.warning(
+                    "Anti-pattern rejected for %s: forbidden content", skill_id
+                )
+            else:
+                skill.anti_patterns.append(
+                    sanitize_for_prompt(anti_pattern, MAX_ANTI_PATTERN_CHARS)
+                )
         # Ajuste confidence à la baisse
         total = skill.success_count + skill.failure_count
         skill.confidence = max(0.1, skill.confidence - 0.1)
@@ -380,16 +481,18 @@ class AutoSkillStore:
     # ── Internes ──────────────────────────────────────────────────────
 
     def _is_safe(self, skill: Skill) -> bool:
-        """Vérifie que le skill ne contient pas d'instruction interdite."""
+        """Vérifie que le skill ne contient pas d'instruction interdite.
+
+        Couvre TOUS les champs texte réinjectés dans le prompt, y compris
+        ``anti_patterns`` (qui font partie du to_markdown() injecté).
+        """
         full_text = " ".join([
             skill.trigger,
             " ".join(skill.approach),
             " ".join(skill.validation),
+            " ".join(skill.anti_patterns),
         ])
-        for pattern in _FORBIDDEN_PATTERNS:
-            if pattern.search(full_text):
-                return False
-        return True
+        return not _content_is_forbidden(full_text)
 
     def _find_similar(
         self,
@@ -424,9 +527,13 @@ class AutoSkillStore:
         """Persiste l'index JSON + exporte les fichiers MD."""
         data = {
             "version": 1,
-            "skills": [s.as_dict() for s in self._skills.values()],
+            "skills": [_to_native(s.as_dict()) for s in self._skills.values()],
         }
-        # Atomic write
+        # Atomic write. _to_native() convertit les scalaires numpy/torch
+        # (np.float32, etc.) en types Python natifs : sans ça, json.dump
+        # lève « Object of type float32 is not JSON serializable » et
+        # AUCUN skill n'est persisté (confidence/doubt viennent parfois
+        # de calculs numpy dans le pipeline).
         tmp = self._index_path.with_suffix(".tmp")
         with tmp.open("w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -439,8 +546,13 @@ class AutoSkillStore:
             md_path = self.storage_dir / "exports" / f"{skill.skill_id}.md"
             try:
                 md_path.write_text(skill.to_markdown(), encoding="utf-8")
-            except Exception:
-                log.warning("Failed to export MD for %s", skill.skill_id)
+            except Exception as exc:
+                # On logge la cause réelle (pas juste « Failed »), et on
+                # continue : l'export MD est secondaire, le JSON reste la
+                # source de vérité.
+                log.warning(
+                    "Failed to export MD for %s: %s", skill.skill_id, exc
+                )
 
     def _load(self) -> None:
         if not self._index_path.exists():
@@ -454,6 +566,18 @@ class AutoSkillStore:
                         k: v for k, v in entry.items()
                         if k in Skill.__dataclass_fields__  # type: ignore[attr-defined]
                     })
+                    # Quarantaine au chargement : un skills.json édité à la
+                    # main (ou un skill hérité d'une version sans filtre)
+                    # pourrait contenir une injection — add() ne re-vérifie
+                    # pas les skills déjà en base. On archive plutôt que de
+                    # supprimer (auditable), et l'archivage exclut le skill
+                    # de l'injection prompt (active()/find filtrent archived).
+                    if not skill.archived and not self._is_safe(skill):
+                        skill.archived = True
+                        log.warning(
+                            "Skill %s quarantined at load: forbidden content",
+                            skill.skill_id,
+                        )
                     self._skills[skill.skill_id] = skill
                 except Exception as exc:
                     log.warning("Failed to load skill entry: %s", exc)
@@ -520,11 +644,42 @@ class SkillExtractor:
         if len(user_message) < 10 or len(assistant_response) < 50:
             return None
 
-        # Extraction
+        # ── Filtre anti-conversation (garde-fou sémantique rapide) ────
+        # Les seuils ci-dessus ne vérifient que la FORME (longueur,
+        # confiance). Sans ce filtre, une simple présentation sociale
+        # (« Je m'appelle Michael ») ou un échange trivial devient un
+        # « skill », ce qui n'a aucun sens : un skill doit capturer une
+        # MÉTHODE réutilisable, pas un fait ponctuel ou une politesse.
+        # Ce filtre rejette les cas évidents SANS coûter de tokens LLM.
+        if self._looks_conversational(user_message, assistant_response):
+            log.debug(
+                "Skill extraction skipped: échange conversationnel/trivial (%r)",
+                user_message[:50],
+            )
+            return None
+
+        # Extraction — jugement LLM en priorité, repli heuristique.
+        # Le filtre _looks_conversational a déjà écarté les échanges
+        # sociaux/triviaux évidents. Trois cas avec un callback LLM :
+        #   - le LLM renvoie un skill structuré → on l'utilise ;
+        #   - le LLM dit « skip » (épisode trivial) → on RESPECTE et on
+        #     n'extrait rien (ne pas retomber sur l'heuristique, sinon on
+        #     annulerait le jugement du LLM) ;
+        #   - le LLM est indisponible (pas de modèle chargé) → repli
+        #     heuristique pour que les skills se créent quand même.
         if self._llm_callback is not None:
-            extracted = self._extract_via_llm(
+            verdict = self._extract_via_llm(
                 user_message, assistant_response
             )
+            if verdict == _LLM_UNAVAILABLE:
+                extracted = self._extract_heuristic(
+                    user_message, assistant_response
+                )
+            elif not verdict:
+                # skip explicite → pas de skill
+                return None
+            else:
+                extracted = verdict
         else:
             extracted = self._extract_heuristic(
                 user_message, assistant_response
@@ -533,15 +688,52 @@ class SkillExtractor:
         if not extracted:
             return None
 
+        # ── Validation stricte du contenu extrait ──────────────────────
+        # Le dict peut venir du LLM (JSON parsé, types non garantis :
+        # approach pourrait être une string, contenir des dicts, ou
+        # embarquer une injection via des sauts de ligne). On coerce en
+        # types stricts et on neutralise la structure. Le contenu passera
+        # ENSUITE par AutoSkillStore._is_safe() (patterns interdits) —
+        # ceci est la couche de validation de FORME, _is_safe celle de
+        # FOND.
+        def _as_str_list(value, max_items: int, max_chars: int) -> list[str]:
+            if isinstance(value, str):
+                value = [value]
+            if not isinstance(value, (list, tuple)):
+                return []
+            out: list[str] = []
+            for item in value[:max_items]:
+                if isinstance(item, (str, int, float)):
+                    s = sanitize_for_prompt(str(item), max_chars)
+                    if s:
+                        out.append(s)
+            return out
+
+        clean_trigger = sanitize_for_prompt(
+            str(extracted.get("trigger") or user_message), MAX_TRIGGER_CHARS
+        )
+        clean_approach = _as_str_list(
+            extracted.get("approach"), MAX_APPROACH_STEPS, MAX_APPROACH_STEP_CHARS
+        )
+        clean_validation = _as_str_list(
+            extracted.get("validation"), 5, MAX_VALIDATION_CHARS
+        )
+        clean_anti = _as_str_list(
+            extracted.get("anti_patterns"), 5, MAX_ANTI_PATTERN_CHARS
+        )
+        if not clean_approach:
+            # Un skill sans approche exploitable n'a aucune valeur.
+            return None
+
         # Construction du Skill
         skill_id = self._make_id(user_message)
         return Skill(
             skill_id=skill_id,
-            trigger=extracted.get("trigger", user_message[:MAX_TRIGGER_CHARS]),
+            trigger=clean_trigger,
             trigger_embedding=trigger_embedding or [],
-            approach=extracted.get("approach", []),
-            validation=extracted.get("validation", []),
-            anti_patterns=extracted.get("anti_patterns", []),
+            approach=clean_approach,
+            validation=clean_validation,
+            anti_patterns=clean_anti,
             success_count=1,
             failure_count=0,
             confidence=max(0.5, 1.0 - doubt_index),
@@ -549,6 +741,90 @@ class SkillExtractor:
         )
 
     # ── Internes ──────────────────────────────────────────────────────
+
+    # Patterns d'ouverture de messages purement conversationnels /
+    # sociaux : présentation, salutation, remerciement, méta-discussion
+    # sur la conversation elle-même. Un message qui commence par ça
+    # n'est presque jamais une demande de résolution de problème.
+    _CONVERSATIONAL_OPENERS = (
+        "je m'appelle", "je m appelle", "moi c'est", "moi c est",
+        "je suis ", "mon nom est", "on m'appelle", "appelle-moi",
+        "bonjour", "salut", "coucou", "bonsoir", "hello", "hey", "hi ",
+        "merci", "thanks", "thank you", "ok merci", "d'accord",
+        "comment vas-tu", "comment ça va", "ça va", "comment tu vas",
+        "quel est ton nom", "comment tu t'appelles", "qui es-tu",
+        "au revoir", "bonne nuit", "à bientôt", "à plus", "bye",
+        "enchanté", "ravi de", "content de te",
+    )
+
+    # Mots qui signalent une vraie tâche/problème (présence = plutôt
+    # gardé). Sert de contre-indice : si le message est court mais
+    # contient un verbe d'action technique, on ne le classe pas
+    # conversationnel.
+    _TASK_SIGNALS = (
+        "comment", "pourquoi", "explique", "calcule", "code", "écris",
+        "corrige", "débogue", "debug", "implémente", "optimise", "analyse",
+        "compare", "résous", "resous", "trouve", "génère", "genere",
+        "convertis", "traduis", "liste", "montre", "crée", "cree",
+        "configure", "installe", "déploie", "teste", "fonction", "erreur",
+        "algorithme", "requête", "requete", "script", "commande",
+    )
+
+    def _looks_conversational(
+        self, user_message: str, assistant_response: str
+    ) -> bool:
+        """Vrai si l'échange est social/trivial plutôt qu'une compétence.
+
+        Heuristique volontairement conservatrice : en cas de doute, elle
+        laisse passer (retourne False) — c'est le jugement LLM en aval
+        qui tranchera finement. On ne bloque que les cas ÉVIDENTS pour
+        économiser des tokens et éviter les faux skills grossiers du type
+        « Je m'appelle Michael ».
+        """
+        msg = user_message.strip().lower()
+        if not msg:
+            return True
+
+        starts_social = any(
+            msg.startswith(op) for op in self._CONVERSATIONAL_OPENERS
+        )
+
+        # Les salutations sociales peuvent contenir « comment » (« comment
+        # ça va », « comment vas-tu »). On ne considère donc un signal de
+        # tâche comme valide que s'il n'est pas neutralisé par une
+        # ouverture sociale claire de type question de politesse.
+        SOCIAL_QUESTION_PHRASES = (
+            "comment vas-tu", "comment ça va", "comment ca va",
+            "comment tu vas", "comment allez-vous", "comment tu t'appelles",
+            "quel est ton nom", "qui es-tu", "comment tu t appelles",
+            "comment tu te sens", "quoi de neuf",
+        )
+        # Détecte ces tournures n'importe où dans le message (pas
+        # seulement en préfixe) : « Bonjour, comment ça va ? » commence
+        # par « bonjour » mais la partie sociale « comment ça va » est
+        # au milieu.
+        contains_social_question = any(
+            p in msg for p in SOCIAL_QUESTION_PHRASES
+        )
+        has_task_signal = (
+            any(sig in msg for sig in self._TASK_SIGNALS)
+            and not contains_social_question
+        )
+
+        # Question purement sociale → conversationnel.
+        if contains_social_question and len(msg) < 45:
+            return True
+
+        # Cas 1 : court + ouverture sociale + aucun signal de tâche.
+        if len(msg) < 40 and starts_social and not has_task_signal:
+            return True
+
+        # Cas 2 : ouverture sociale et pas de signal de tâche du tout,
+        # même si le message est un peu plus long.
+        if starts_social and not has_task_signal:
+            return True
+
+        return False
 
     def _extract_heuristic(
         self, user_message: str, assistant_response: str
@@ -605,6 +881,13 @@ retourne {{"skip": true}}.
 """
         try:
             result = self._llm_callback(prompt)  # type: ignore[misc]
+            # Le callback signale explicitement son indisponibilité
+            # (pas de modèle) → on propage la sentinelle pour que extract()
+            # retombe sur l'heuristique.
+            if result is _LLM_UNAVAILABLE or (
+                isinstance(result, dict) and result.get("_llm_unavailable")
+            ):
+                return _LLM_UNAVAILABLE
             if not result or result.get("skip"):
                 return None
             return result
@@ -619,6 +902,29 @@ retourne {{"skip": true}}.
 
 
 # ── Helpers math ──────────────────────────────────────────────────────
+
+
+def _to_native(obj):
+    """Convertit récursivement numpy/torch scalars en types Python natifs.
+
+    json.dump et yaml.safe_dump rejettent np.float32, np.int64,
+    torch.Tensor, etc. (« not JSON serializable » / « cannot represent
+    an object »). Comme confidence, doubt_index et certaines valeurs
+    d'embedding peuvent provenir de calculs numpy/torch dans le pipeline,
+    on normalise à la frontière de persistance pour que la sauvegarde
+    ne casse jamais.
+    """
+    if isinstance(obj, dict):
+        return {k: _to_native(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_native(x) for x in obj]
+    # numpy / torch scalar → .item() donne un type Python natif
+    if hasattr(obj, "item") and not isinstance(obj, (str, bytes)):
+        try:
+            return obj.item()
+        except Exception:
+            pass
+    return obj
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:

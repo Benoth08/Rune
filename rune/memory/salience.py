@@ -19,7 +19,7 @@ from rune.config import (
     SALIENCE_REDUNDANCY_THRESHOLD,
 )
 
-log = logging.getLogger("lythea.memory.salience")
+log = logging.getLogger("rune.memory.salience")
 
 NOISE_WORDS = frozenset({
     "ok", "oui", "non", "merci", "salut", "bonjour", "hey", "hi", "hello",

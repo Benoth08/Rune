@@ -46,7 +46,7 @@ from typing import Iterable
 
 from rune.cognition.warnings_v4 import format_warning
 
-log = logging.getLogger("lythea.cognition.timeline")
+log = logging.getLogger("rune.cognition.timeline")
 
 
 EVENT_KINDS = ("absolute", "relative", "duration", "ordinal", "vague")

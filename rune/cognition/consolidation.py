@@ -19,7 +19,7 @@ In Lythéa this is split between two cycles:
    of a long session.
 
 The :class:`MicrosleepManager` itself lives in
-:mod:`lythea.microsleep` — it is the cognitive-science engine.
+:mod:`rune.microsleep` — it is the cognitive-science engine.
 :class:`ConsolidationPhase` here is the orchestration layer:
 threading, locks, timers, persistence, and git sync. The split
 mirrors how the original Hippocampe code was already structured;
@@ -57,7 +57,7 @@ from rune.config import (
     SDM_DIR,
 )
 
-log = logging.getLogger("lythea.cognition.consolidation")
+log = logging.getLogger("rune.cognition.consolidation")
 
 
 # Aggressive SDM prune threshold for deep sleep. Anything below

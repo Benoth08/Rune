@@ -43,7 +43,7 @@ _IGNORE_DIRS = {
     ".ruff_cache", "node_modules", ".tox", ".eggs",
 }
 
-log = logging.getLogger("lythea.server.workspace")
+log = logging.getLogger("rune.server.workspace")
 
 
 # ── Configuration ─────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ from typing import Any
 
 from rune.config import RETRIEVAL_RRF_K, RETRIEVAL_RERANK_TOP, RETRIEVAL_TOP_N
 
-log = logging.getLogger("lythea.memory.retrieval")
+log = logging.getLogger("rune.memory.retrieval")
 
 
 class HybridRetriever:

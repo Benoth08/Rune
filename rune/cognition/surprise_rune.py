@@ -48,7 +48,7 @@ class SurpriseSignals:
         }
 
 
-# Poids des composantes (cf. lythea.config — SURPRISE_W_*)
+# Poids des composantes (cf. rune.config — SURPRISE_W_*)
 DEFAULT_WEIGHTS = {
     "structural": 0.4,
     "episodic": 0.3,

@@ -51,8 +51,8 @@ class Worker(Protocol):
 class InProcessWorker:
     """Wraps the shared, steered ModelWrapper (the Rune core)."""
 
-    model: object  # lythea.model.ModelWrapper
-    name: str = "taelys-core"
+    model: object  # rune.model.ModelWrapper
+    name: str = "rune-core"
     needs_prefix: bool = True
 
     def available(self) -> bool:

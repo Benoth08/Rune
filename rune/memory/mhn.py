@@ -14,7 +14,7 @@ import torch
 
 from rune.config import MHN_BETA, MHN_DIM, MHN_MAX_PATTERNS
 
-log = logging.getLogger("lythea.memory.mhn")
+log = logging.getLogger("rune.memory.mhn")
 
 
 class ModernHopfieldNetwork:

@@ -48,7 +48,13 @@ if [ -x "$SCRIPT_DIR/searxng_bootstrap.sh" ]; then
         if [ -n "$SEARXNG_URL" ]; then
             echo "  ✅ SearXNG actif : $SEARXNG_URL (PID $SEARXNG_PID)"
             export LYTHEA_SEARXNG_INSTANCE_URL="$SEARXNG_URL"
-            export LYTHEA_WEB_PROVIDER="searxng"
+            # On ne force PAS le provider sur "searxng" : on garde le mode
+            # composite (auto) qui essaie SearXNG en premier PUIS retombe
+            # sur DDG si les requêtes SearXNG échouent (rate-limit Google,
+            # instances bloquées…). Forcer "searxng" seul supprimerait ce
+            # fallback — c'est ce qui donnait "All SearXNG instances failed"
+            # sans réponse. Le mode auto est le défaut, donc rien à exporter.
+            export LYTHEA_WEB_PROVIDER="auto"
         fi
     else
         echo "  ⚠️  SearXNG bootstrap a échoué — fallback sur DDG."
@@ -146,7 +152,7 @@ ELAPSED=$(curl -s "http://localhost:$PORT/api/boot/status" 2>/dev/null | python3
 
 # ── Display URLs ───────────────────────────────────────────────────────
 echo ""
-echo "🌟 Taëlys est prête ! (preload total: ${ELAPSED}s)"
+echo "🌟 Rune est prêt ! (preload total: ${ELAPSED}s)"
 if [ -n "$URL" ]; then
     echo "🔗 Tunnel : $URL"
 else

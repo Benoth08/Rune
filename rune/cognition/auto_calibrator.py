@@ -48,7 +48,7 @@ from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 
-log = logging.getLogger("lythea.cognition.auto_calibrator")
+log = logging.getLogger("rune.cognition.auto_calibrator")
 
 
 # ════════════════════════════════════════════════════════════════════

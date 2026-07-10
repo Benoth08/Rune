@@ -1,4 +1,4 @@
-"""Unit tests for :class:`lythea.cognition.surprise.SurprisePhase`.
+"""Unit tests for :class:`rune.cognition.surprise.SurprisePhase`.
 
 Each of the four signals is tested in isolation, plus the
 JSON-shape contract via ``as_dict``, plus the post-generation

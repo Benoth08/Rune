@@ -187,7 +187,7 @@ def get_backend(config: dict | None = None) -> ModelBackend:
     cfg = config or {}
     backend_kind = (
         cfg.get("backend")
-        or os.environ.get("HERMES_LYTHEA_BACKEND", "auto")
+        or os.environ.get("RUNE_BACKEND", "auto")
         or "auto"
     ).lower()
 

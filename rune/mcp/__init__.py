@@ -16,7 +16,7 @@ Three core components :
 Public API for the rest of Lythéa
 ---------------------------------
 The :class:`MCPServerManager` singleton is created at boot
-(:func:`lythea.boot.init_mcp`) and stored on the FastAPI app
+(:func:`rune.boot.init_mcp`) and stored on the FastAPI app
 (``app.mcp_manager``). Callers (hippocampe, routes) use::
 
     tools = app.mcp_manager.list_tools()

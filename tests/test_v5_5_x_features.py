@@ -227,9 +227,14 @@ class TestSystemPromptHardened:
     def test_concrete_examples_present(self):
         """Le prompt donne des exemples négatifs/positifs concrets."""
         from rune.config import SYSTEM_PROMPT
-        # On vérifie qu'il y a au moins 1 exemple négatif et 1 positif
-        assert "NE faut PAS faire" in SYSTEM_PROMPT
-        assert "il faut faire" in SYSTEM_PROMPT
+        # On vérifie qu'il y a au moins 1 marqueur d'exemple négatif
+        # (« à éviter », « JAMAIS ») et 1 formulation contrastive
+        # positive (« plutôt que »). Le prompt a évolué depuis la
+        # formulation « NE faut PAS faire » d'origine ; on teste
+        # désormais la présence de guidage négatif/positif, pas une
+        # tournure figée.
+        assert "éviter" in SYSTEM_PROMPT or "JAMAIS" in SYSTEM_PROMPT
+        assert "plutôt que" in SYSTEM_PROMPT
 
 
 # ═══════════════════════════════════════════════════════════════════════

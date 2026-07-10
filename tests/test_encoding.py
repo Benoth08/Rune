@@ -1,4 +1,4 @@
-"""Unit tests for :class:`lythea.cognition.encoding.EncodingPhase`.
+"""Unit tests for :class:`rune.cognition.encoding.EncodingPhase`.
 
 These tests use mocks for the model, entity extractor, and salience
 filter so they run without torch / GLiNER installed. The phase is
@@ -87,7 +87,7 @@ def test_has_images_bypasses_salience_filter():
     would be filtered out by the salience cascade.
 
     Without this whitelist, "Décris cette image" lands in the noise
-    bucket and the resulting exchange (image + Taëlys's description)
+    bucket and the resulting exchange (image + Rune's description)
     is never archived to Chroma — losing what is actually a content-
     rich turn. With ``has_images=True`` we override that verdict.
     """

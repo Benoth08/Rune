@@ -52,7 +52,7 @@ import shutil
 from dataclasses import dataclass, field
 from typing import Any
 
-log = logging.getLogger("lythea.mcp.client")
+log = logging.getLogger("rune.mcp.client")
 
 
 # ── Exceptions ────────────────────────────────────────────────────────

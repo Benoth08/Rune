@@ -1,4 +1,4 @@
-"""Tests for lythea.server.codegen — multi-file extraction + zip.
+"""Tests for rune.server.codegen — multi-file extraction + zip.
 
 Pure-Python (no torch / chromadb), so part of the always-run whitelist.
 """

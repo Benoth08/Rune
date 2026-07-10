@@ -61,7 +61,7 @@ import re
 import time
 from typing import Any
 
-log = logging.getLogger("lythea.cognition.deliberation")
+log = logging.getLogger("rune.cognition.deliberation")
 
 
 # ── Garde-fou trivial ──────────────────────────────────────────────────

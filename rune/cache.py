@@ -37,7 +37,7 @@ import threading
 from collections import OrderedDict
 from typing import Callable, Generic, TypeVar
 
-log = logging.getLogger("lythea.cache")
+log = logging.getLogger("rune.cache")
 
 V = TypeVar("V")
 

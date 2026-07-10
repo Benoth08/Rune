@@ -33,7 +33,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-log = logging.getLogger("lythea.server.document_ingest")
+log = logging.getLogger("rune.server.document_ingest")
 
 
 # ── Échantillonnage pour l'extraction d'entités ────────────────────────

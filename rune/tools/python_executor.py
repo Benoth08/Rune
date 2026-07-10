@@ -56,7 +56,7 @@ import tempfile
 import time
 from pathlib import Path
 
-log = logging.getLogger("lythea.tools.python_executor")
+log = logging.getLogger("rune.tools.python_executor")
 
 
 # ── Configuration ─────────────────────────────────────────────────────

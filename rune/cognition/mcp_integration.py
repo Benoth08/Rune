@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-log = logging.getLogger("lythea.cognition.mcp_integration")
+log = logging.getLogger("rune.cognition.mcp_integration")
 
 
 # ── Plan structures ────────────────────────────────────────────────────

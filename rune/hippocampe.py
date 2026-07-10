@@ -3,17 +3,17 @@
 After the Étape 8 refactor this class is a thin orchestrator that
 composes five cognitive phases:
 
-* :class:`~lythea.cognition.encoding.EncodingPhase` — text → latents
-* :class:`~lythea.cognition.storage.StoragePhase` — write SDM/KG, archive Chroma+MHN
-* :class:`~lythea.cognition.surprise.SurprisePhase` — composite surprise + doubt
-* :class:`~lythea.cognition.retrieval.RetrievalPhase` — KG + MHN + Chroma → RAG
-* :class:`~lythea.cognition.consolidation.ConsolidationPhase` — microsleep + deep sleep
+* :class:`~rune.cognition.encoding.EncodingPhase` — text → latents
+* :class:`~rune.cognition.storage.StoragePhase` — write SDM/KG, archive Chroma+MHN
+* :class:`~rune.cognition.surprise.SurprisePhase` — composite surprise + doubt
+* :class:`~rune.cognition.retrieval.RetrievalPhase` — KG + MHN + Chroma → RAG
+* :class:`~rune.cognition.consolidation.ConsolidationPhase` — microsleep + deep sleep
 
 Plus:
 
-* :mod:`~lythea.cognition.generation` — text-stream cleanup + two-pass reasoning
-* :class:`~lythea.web.WebAgent` — optional live-search augmentation
-* :class:`~lythea.model.ImageCaptioner` — optional image captioning
+* :mod:`~rune.cognition.generation` — text-stream cleanup + two-pass reasoning
+* :class:`~rune.web.WebAgent` — optional live-search augmentation
+* :class:`~rune.model.ImageCaptioner` — optional image captioning
 
 The public surface (``process_message``, ``reset_session``,
 ``deep_sleep``, ``memory_status``) is unchanged from the
@@ -62,7 +62,7 @@ from rune.model import HFModelWrapper, ImageCaptioner
 from rune.temporal import TemporalContext
 from rune.web import WebAgent, WebTriggerPolicy
 
-log = logging.getLogger("lythea.hippocampe")
+log = logging.getLogger("rune.hippocampe")
 
 
 # Re-export from cognition.generation so external code that imports
@@ -3237,7 +3237,75 @@ class Hippocampe:
 
     def deep_sleep(self) -> str:
         """Manual deep consolidation — delegates to :class:`ConsolidationPhase`."""
+        self._retention_gc()
         return self.consolidation_phase.deep_sleep()
+
+    def _retention_gc(self) -> None:
+        """V5.9 — Purge les échanges ``exchange`` non consultés depuis
+        ``RETENTION_TTL_DAYS`` jours. Les ``consolidated`` sont épargnés
+        (permanents, type différent hors du champ de la requête).
+        Best-effort : n'interrompt jamais le deep sleep.
+
+        Sûreté (5 modes de défaillance fermés explicitement) :
+        1. Refresh d'accès câblé sur les chunks POST-CRAG réellement
+           injectés (voir retrieval._gather_semantic), pas un sous-chemin.
+        2. Timestamp absent → ``ref`` tombe sur ``ts`` (présent sur les
+           anciens chunks) puis 0 ; le garde ``ref and ref < cutoff``
+           traite 0 comme faux → chunk pré-migration JAMAIS purgé.
+        3. Ne tourne qu'au deep_sleep, lui-même déclenché par le
+           ConsolidationScheduler (seuil atteint) — pas jamais, pas à
+           chaque tour.
+        4. ``consolidated`` a un type distinct ("consolidated") : la
+           requête ``where={"type": "exchange"}`` ne peut physiquement
+           pas les voir, indépendamment d'un quelconque flag.
+        5. DRY-RUN par défaut si ``RETENTION_GC_DRY_RUN`` : logge ce qui
+           serait purgé sans supprimer, pour valider sur données réelles
+           avant d'armer la suppression.
+        """
+        if self.chroma is None:
+            return
+        try:
+            import os
+            from rune.config import RETENTION_TTL_DAYS
+            cutoff = time.time() - RETENTION_TTL_DAYS * 86400.0
+            got = self.chroma.get(
+                where={"type": "exchange"}, include=["metadatas"]
+            )
+            ids = got.get("ids", []) or []
+            metas = got.get("metadatas", []) or []
+            stale = []
+            for _i, _m in zip(ids, metas):
+                _m = _m or {}
+                # Priorité : dernier accès > création > ts legacy > 0.
+                ref = _m.get(
+                    "last_access_ts",
+                    _m.get("created_ts", _m.get("ts", 0)),
+                )
+                # `ref and` : un timestamp 0/absent est faux → épargné
+                # (mode 2). On ne purge que ce qui a une date FIABLE et
+                # antérieure au cutoff.
+                if ref and ref < cutoff:
+                    stale.append(_i)
+            if not stale:
+                return
+            # Mode 5 : dry-run opt-in (variable d'env), pour un premier
+            # passage d'observation sans rien détruire.
+            dry_run = os.getenv("RETENTION_GC_DRY_RUN", "").lower() in (
+                "1", "true", "yes",
+            )
+            if dry_run:
+                log.info(
+                    "Retention GC [DRY-RUN] : %d chunks 'exchange' seraient "
+                    "purgés (aucune suppression). ids=%s",
+                    len(stale), stale[:20],
+                )
+                return
+            self.chroma.delete(ids=stale)
+            log.info(
+                "Retention GC: purged %d stale 'exchange' chunks", len(stale)
+            )
+        except Exception as exc:
+            log.warning("Retention GC failed: %s", exc)
 
     # ── Memory status ──────────────────────────────────────────────────
 

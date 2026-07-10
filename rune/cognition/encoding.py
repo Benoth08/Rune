@@ -47,7 +47,7 @@ from typing import Any
 
 import torch
 
-log = logging.getLogger("lythea.cognition.encoding")
+log = logging.getLogger("rune.cognition.encoding")
 
 
 # Generic-noise stop list for KG entity filtering. Identical to the

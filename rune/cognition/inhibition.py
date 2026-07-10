@@ -45,7 +45,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-log = logging.getLogger("lythea.cognition.inhibition")
+log = logging.getLogger("rune.cognition.inhibition")
 
 
 # ── Constants ────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ _N1_PATTERNS_RAW: dict[str, str] = {
     "api_key_leak": r"(?i)(?:api[_-]?key|sk[_-]live|pk[_-]live|bearer\s+[A-Za-z0-9._-]{20,})",
     "private_key": r"-----BEGIN (?:RSA|OPENSSH|DSA|EC|PRIVATE) (?:PRIVATE )?KEY-----",
     "aws_access_key": r"\bAKIA[0-9A-Z]{16}\b",
-    "system_prompt_echo": r"(?i)tu es taëlys.*r[èe]gles? absolues",
+    "system_prompt_echo": r"(?i)tu es rune.*r[èe]gles? absolues",
     "instruction_override": r"(?i)ignore (?:all )?(?:previous|prior|above) instructions",
     # V5.9.2 — Pattern credit_card durci pour éviter les faux positifs
     # sur les nombres scientifiques. Le pattern initial matchait toute

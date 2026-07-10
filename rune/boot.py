@@ -27,7 +27,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-log = logging.getLogger("lythea.boot")
+log = logging.getLogger("rune.boot")
 
 
 # ── Stage names (single source of truth, used by UI too) ──────────────
@@ -333,7 +333,7 @@ class BootRunner:
         # ── Rune — Auto-install Node.js si manquant ──────────────────
         # RUNE_AUTO_INSTALL_NODE=true par défaut. Mis à false si l'user
         # veut gérer Node lui-même (env contraintes, root interdit, etc.).
-        auto_install_node = getattr(s, "rune_auto_install_node", True)
+        auto_install_node = get_rune_settings().auto_install_node
         if not shutil.which("node") and auto_install_node:
             self.state.begin_stage("mcp", details="installation Node.js…")
             try:
@@ -519,7 +519,6 @@ class BootRunner:
         ce stage est skippé car Trinity s'occupe de charger les modèles.
         """
         import os
-        from rune.settings import get_settings
         from rune.config import DEFAULT_MODEL
 
         self.state.begin_stage("model_autoload", details="vérification config…")
@@ -533,23 +532,19 @@ class BootRunner:
             )
             return
 
-        s = get_settings()
-        # RUNE_AUTOLOAD_MODEL — pas dans settings.py par défaut, on lit
-        # directement l'env pour éviter de modifier le schéma Lythea.
-        autoload = os.environ.get(
-            "RUNE_AUTOLOAD_MODEL", "false"
-        ).lower() in {"1", "true", "yes", "on"}
+        from rune.settings import get_rune_settings
+        rs = get_rune_settings()
 
-        if not autoload:
+        if not rs.autoload_model:
             self.state.end_stage(
                 "model_autoload", "skipped",
                 "RUNE_AUTOLOAD_MODEL=false — chargez via POST /api/models/load",
             )
             return
 
-        # Model ID à charger
+        # Model ID à charger (RuneSettings > LYTHEA_DEFAULT_MODEL > config)
         model_id = (
-            os.environ.get("RUNE_DEFAULT_MODEL")
+            rs.default_model
             or os.environ.get("LYTHEA_DEFAULT_MODEL")
             or DEFAULT_MODEL
         )
@@ -587,7 +582,8 @@ class BootRunner:
         from pathlib import Path
         import yaml
 
-        config_path = os.environ.get("RUNE_TRINITY_CONFIG")
+        from rune.settings import get_rune_settings
+        config_path = get_rune_settings().trinity_config or None
         if not config_path:
             return False
         path = Path(config_path)
@@ -617,7 +613,8 @@ class BootRunner:
 
         self.state.begin_stage("trinity", details="vérification config…")
 
-        config_path = os.environ.get("RUNE_TRINITY_CONFIG")
+        from rune.settings import get_rune_settings
+        config_path = get_rune_settings().trinity_config or None
         if not config_path:
             self.state.end_stage(
                 "trinity", "skipped",

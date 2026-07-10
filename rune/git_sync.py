@@ -26,7 +26,7 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 
-log = logging.getLogger("lythea.git_sync")
+log = logging.getLogger("rune.git_sync")
 
 
 @contextmanager
@@ -103,7 +103,7 @@ class GitSync:
             self._run("git", "init")
             self._run("git", "remote", "remove", "origin", check=False)
             self._run("git", "remote", "add", "origin", clean_url)
-            self._run("git", "config", "user.email", "taelys@lythea.local")
+            self._run("git", "config", "user.email", "rune@rune.local")
             self._run("git", "config", "user.name", "Rune")
             # Disable any system-wide credential helper that might cache.
             self._run("git", "config", "credential.helper", "")

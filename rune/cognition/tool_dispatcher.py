@@ -36,7 +36,7 @@ import time
 from collections import OrderedDict
 from typing import Protocol
 
-log = logging.getLogger("lythea.cognition.tool_dispatcher")
+log = logging.getLogger("rune.cognition.tool_dispatcher")
 
 
 # ── Valid tool names ────────────────────────────────────────────────────

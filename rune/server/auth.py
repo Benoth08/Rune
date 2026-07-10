@@ -49,7 +49,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-log = logging.getLogger("lythea.server.auth")
+log = logging.getLogger("rune.server.auth")
 
 
 # ── IP/host helpers ───────────────────────────────────────────────────

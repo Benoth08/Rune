@@ -25,7 +25,10 @@ import pytest
 
 # torch needed for Hippocampe init in standard tests; we skip the whole
 # module in sandbox without torch.
-pytest.importorskip("torch", reason="Hippocampe needs torch for init")
+try:
+    import torch as _torch_check  # noqa: F401
+except (ImportError, OSError):
+    pytest.skip("torch not available or broken CUDA", allow_module_level=True)
 pytest.importorskip("httpx", reason="cascade needs httpx")
 
 
@@ -75,6 +78,11 @@ class _FakeHippocampe:
         )
         self.sampling_profile = SimpleNamespace()
         self._cascade = None
+        # Clé API saisie à chaud (UI) — RAM only. Le vrai Hippocampe la
+        # définit dans __init__ ; le mock doit la reproduire car
+        # _build_cascade_if_enabled la lit (self._cascade_key_override
+        # or settings.google_api_key).
+        self._cascade_key_override = None
 
     # Bind real methods from Hippocampe so we test the actual code.
     from rune.hippocampe import Hippocampe
@@ -102,7 +110,7 @@ class TestCascadeBuilder:
 
     def test_enabled_with_invalid_key_returns_none(self):
         """Bad key format must NOT crash — log warning, return None,
-        let Lythéa run in V3 mode."""
+        let Rune run in V3 mode."""
         h = _FakeHippocampe()
         s = _make_minimal_settings(
             enable_cascade=True, google_api_key="not-a-valid-key"
@@ -131,9 +139,9 @@ class TestCascadeBuilder:
 
 class TestCascadeStatus:
     def _patched_settings(self, **kw):
-        """Patch lythea.settings.get_settings to return our fake."""
+        """Patch rune.settings.get_settings to return our fake."""
         s = _make_minimal_settings(**kw)
-        return patch("lythea.settings.get_settings", return_value=s)
+        return patch("rune.settings.get_settings", return_value=s)
 
     def test_status_disabled_has_required_fields(self):
         h = _FakeHippocampe()

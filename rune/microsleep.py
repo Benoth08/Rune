@@ -57,7 +57,7 @@ try:
 except ImportError:  # pragma: no cover
     torch = None  # type: ignore
 
-log = logging.getLogger("lythea.microsleep")
+log = logging.getLogger("rune.microsleep")
 
 
 # ── Configurable thresholds (overridable via settings) ────────────────

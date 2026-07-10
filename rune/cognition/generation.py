@@ -39,7 +39,7 @@ from typing import Any
 
 from rune.config import THINKING_TAGS
 
-log = logging.getLogger("lythea.cognition.generation")
+log = logging.getLogger("rune.cognition.generation")
 
 
 # Question-starts (FR + EN). Used by the orchestrator's archive
@@ -85,7 +85,7 @@ def strip_reasoning(text: str, allow_unclosed: bool = False) -> tuple[str, str]:
     """Strip reasoning/thinking blocks and two-pass artifacts from text.
 
     Reasoning is captured in dedicated tags (configured via
-    :data:`lythea.config.THINKING_TAGS`, typically ``reflexion`` and
+    :data:`rune.config.THINKING_TAGS`, typically ``reflexion`` and
     ``thinking``). The model produces them inline with the response;
     the UI separates them so the user sees only the final answer
     by default.

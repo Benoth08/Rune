@@ -19,10 +19,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# The routes module transitively imports lythea.model which requires
+# The routes module transitively imports rune.model which requires
 # torch. In the sandbox without torch, skip the whole module — on the
 # real pod torch is always available so these tests run normally.
-pytest.importorskip("torch", reason="lythea.server.routes imports model which needs torch")
+try:
+    import torch
+except (ImportError, OSError):
+    pytest.skip("torch not available or broken CUDA", allow_module_level=True)
 
 
 def _make_request(entropy_threshold: float = 0.2, web_mode: str = "auto"):

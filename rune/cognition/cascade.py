@@ -77,7 +77,7 @@ class LocalGenerator(Protocol):
     standard pipeline; we wrap that as a synchronous ``generate`` here
     so the cascade can stay sync and decoupled from streaming.
 
-    The actual implementation lives in :mod:`lythea.model`; this
+    The actual implementation lives in :mod:`rune.model`; this
     Protocol is kept here so tests can pass simple mocks without
     importing torch.
     """

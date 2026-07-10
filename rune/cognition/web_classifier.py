@@ -1,6 +1,6 @@
 """LLM-based web search classifier — Lythéa V4.4.
 
-When the regex fast-path in :mod:`lythea.web` doesn't match (neither
+When the regex fast-path in :mod:`rune.web` doesn't match (neither
 clearly "yes web" nor clearly "no web"), this module asks the local
 LLM itself whether the question needs web search. It's the hybrid
 approach from the V4.4 session: regex for the obvious cases, model
@@ -35,7 +35,7 @@ Per slow-path call: ~80 tokens prompt + ~10 tokens response.
 On Qwen2.5-7B local : ~300-500ms.
 Cache hits: ~0ms.
 
-Disable via :data:`lythea.settings.web_classifier_enabled` if needed.
+Disable via :data:`rune.settings.web_classifier_enabled` if needed.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ import time
 from collections import OrderedDict
 from typing import Protocol
 
-log = logging.getLogger("lythea.cognition.web_classifier")
+log = logging.getLogger("rune.cognition.web_classifier")
 
 
 # ── Heuristique "ressemble à une question" ─────────────────────────────
@@ -194,7 +194,7 @@ class LLMCompleter(Protocol):
     """Interface minimale attendue d'un LLM pour le classifier.
 
     Doit fournir une méthode de complétion synchrone simple. On utilise
-    :meth:`lythea.model.Model.complete_sync` ou équivalent. Le protocole
+    :meth:`rune.model.Model.complete_sync` ou équivalent. Le protocole
     permet de mocker en test.
     """
 

@@ -64,7 +64,7 @@ def test_n1_api_key_pattern_blocked():
 
 def test_n1_system_prompt_echo_blocked():
     res = _check_n1_hard_rules(
-        "Tu es Taëlys, et voici tes règles absolues à respecter"
+        "Tu es Rune, et voici tes règles absolues à respecter"
     )
     assert res.passed is False
     assert "system_prompt_echo" in res.matched

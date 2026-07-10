@@ -1,7 +1,7 @@
 """Pydantic Settings — centralised, environment-overridable configuration.
 
 All numeric/behavioural hyperparameters live here. Static structures
-(model catalogue, prompts, label lists) stay in :mod:`lythea.config`.
+(model catalogue, prompts, label lists) stay in :mod:`rune.config`.
 
 Override any setting via environment variable using the ``LYTHEA_`` prefix:
 
@@ -98,9 +98,9 @@ class LytheaSettings(BaseSettings):
     max_history_turns: int = Field(default=10, ge=1, le=200)
 
     # ── Web classifier (LLM-based fallback) ────────────────────────────
-    # V4.4 — Quand le fast-path regex de lythea.web ne matche pas mais
+    # V4.4 — Quand le fast-path regex de rune.web ne matche pas mais
     # que le message ressemble à une question, on demande au LLM local
-    # lui-même de classifier (cf. lythea.cognition.web_classifier).
+    # lui-même de classifier (cf. rune.cognition.web_classifier).
     # Approche hybride inspirée d'Anthropic/OpenAI/Google qui laissent
     # le modèle décider via function calling. Évite le jeu sans fin
     # d'ajout de patterns regex pour chaque cas d'ambiguïté. Coût :
@@ -128,7 +128,7 @@ class LytheaSettings(BaseSettings):
     # ~1-2s par tour sur les cas concernés. Le pattern DeepMind 2023
     # alerte sur la dégradation de performance si appliqué
     # systématiquement — d'où l'activation sélective via
-    # lythea.cognition.reflection.should_reflect().
+    # rune.cognition.reflection.should_reflect().
     reflection_enabled: bool = Field(default=True)
     reflection_timeout_s: float = Field(default=6.0, ge=1.0, le=15.0)
 
@@ -576,3 +576,70 @@ def get_settings() -> LytheaSettings:
     ``get_settings.cache_clear()`` if they need to inject overrides.
     """
     return LytheaSettings()
+
+
+# ── Variables spécifiques Rune (préfixe RUNE_) ────────────────────────
+#
+# Les variables RUNE_* étaient auparavant lues via os.environ.get() dans
+# boot.py, ce qui les rendait invisibles au chargement du .env (pydantic-
+# settings ne charge que les vars LYTHEA_* dans LytheaSettings).
+#
+# Cette classe les intègre proprement dans pydantic-settings :
+# - Lues depuis le .env si présentes (clé RUNE_AUTOLOAD_MODEL, etc.)
+# - Exportables manuellement dans le shell (comportement inchangé)
+# - Invalidables par cache_clear() dans les tests
+#
+# Ne pas ajouter ces champs à LytheaSettings (préfixe LYTHEA_) : ça
+# casserait la compatibilité avec les configs existantes Lythea v5/v4.
+
+
+class RuneSettings(BaseSettings):
+    """Variables d'environnement propres à Rune (préfixe RUNE_)."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="RUNE_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # ── Autoload du modèle au boot ─────────────────────────────────
+    # RUNE_AUTOLOAD_MODEL=true pour charger automatiquement au boot.
+    # Si false (défaut), charger via POST /api/models/load.
+    autoload_model: bool = Field(default=False)
+
+    # Model ID HuggingFace à charger si autoload_model=true.
+    # Défaut vide → repli sur DEFAULT_MODEL dans config.py.
+    default_model: str = Field(default="")
+
+    # ── Auto-install Node.js pour MCP ─────────────────────────────
+    # true (défaut) : tente d'installer Node via apt/brew si manquant.
+    # false : skip silencieux, MCP désactivé si Node absent.
+    auto_install_node: bool = Field(default=True)
+
+    # ── Trinity (pool multi-modèles) ───────────────────────────────
+    # Chemin vers le fichier trinity.yaml. Vide = Trinity désactivé.
+    trinity_config: str = Field(default="")
+
+    # ── Cascade externe ────────────────────────────────────────────
+    # Redouble le flag LYTHEA_ENABLE_CASCADE pour les configs qui
+    # utilisent le préfixe RUNE_ (rétrocompat .env.example v0.1.0).
+    enable_cascade: bool = Field(default=False)
+    cascade_provider: str = Field(default="gemini")
+    cascade_claude_model: str = Field(default="claude-sonnet-4-20250514")
+
+    # ── Subagent ───────────────────────────────────────────────────
+    # Model ID utilisé par les sous-agents (Trinity Worker ou standalone).
+    # Vide = MockBackend (tests) sauf si Trinity configuré.
+    subagent_model_id: str = Field(default="")
+
+
+@lru_cache(maxsize=1)
+def get_rune_settings() -> RuneSettings:
+    """Return the Rune-specific settings singleton.
+
+    Cached like get_settings(). Tests can clear with
+    ``get_rune_settings.cache_clear()``.
+    """
+    return RuneSettings()
