@@ -1047,11 +1047,15 @@ async def agent_status(request: Request) -> dict:
 
     run_id, run = picked
     import time as _t
+    _start = getattr(run, "started_at", _t.time())
+    _end = getattr(run, "ended_at", 0.0)
+    # Mission terminée → chrono figé à ended_at ; en cours → live.
+    _elapsed = (_end - _start) if _end else (_t.time() - _start)
     mission = {
         "run_id": run_id,
         "task": getattr(run, "task", ""),
         "name": getattr(run, "name", ""),
-        "elapsed_sec": round(_t.time() - getattr(run, "started_at", _t.time()), 1),
+        "elapsed_sec": round(_elapsed, 1),
         "done": bool(getattr(run, "done", False)),
     }
     recent_events = list(getattr(run, "events", []))

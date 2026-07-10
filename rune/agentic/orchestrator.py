@@ -494,6 +494,11 @@ def _clean_synthesis(text: str) -> str:
     boucle, sollicitations. No-op sur une synthèse saine (texte cohérent, sans
     <think>, sans code, sans CoT, sans répétition → rien retiré)."""
     text = _strip_think(text or "")          # raisonnement <think> (modèles thinking)
+    # Certains modèles émettent l'outil « finish » EN TEXTE au lieu d'un
+    # vrai tool call : « ...385. finish{"result": "..."} ». On retire ce
+    # token parasite et son éventuel JSON accolé (no-op si absent).
+    text = re.sub(r'\s*\bfinish\s*\{.*?\}\s*$', '', text, flags=re.S)
+    text = re.sub(r'\s*\bfinish\s*$', '', text)
     # La synthèse est du TEXTE (le code vit dans les fichiers, jamais ici). Les
     # modèles « coder » tendent à déballer du code + de l'auto-revue après leur
     # réponse : on tronque dès le premier bloc ``` → jette le code ET les
@@ -574,6 +579,7 @@ class _Run:
     # deque bornée : ne grossit jamais, garde les N derniers pas de l'agent.
     events: deque = field(default_factory=lambda: deque(maxlen=40))
     started_at: float = field(default_factory=time.time)
+    ended_at: float = 0.0    # figé à la fin → le chrono ne court plus après
     name: str = ""
     slug: str = ""
     done: bool = False
@@ -3930,5 +3936,7 @@ class AgentOrchestrator:
             _r = self._runs.get(run_id)
             if _r is not None:
                 _r.done = True
+                if not _r.ended_at:
+                    _r.ended_at = time.time()    # fige le chrono
                 self._last_run = (run_id, _r)
             self._runs.pop(run_id, None)

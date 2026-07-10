@@ -113,7 +113,19 @@ class TrinityPool:
 
         if model_loader is None:
             from rune.model import HFModelWrapper
-            model_loader = lambda model_id: HFModelWrapper(model_id=model_id)  # noqa: E731
+
+            # HFModelWrapper.__init__() ne prend PAS model_id : on construit
+            # vide puis on appelle load(model_id) (retourne None → on vérifie
+            # is_loaded). Passer model_id au constructeur levait un TypeError
+            # et mettait Trinity en degraded_mode systématiquement.
+            def model_loader(model_id):  # noqa: E731
+                w = HFModelWrapper()
+                w.load(model_id)
+                if not getattr(w, "is_loaded", False):
+                    raise RuntimeError(
+                        f"HFModelWrapper.load({model_id}) : modèle non chargé"
+                    )
+                return w
 
         # Estime la VRAM disponible
         try:

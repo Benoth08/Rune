@@ -34,27 +34,25 @@
 
 ## En une phrase
 
-La plupart des harnais agentiques sont des **orchestrateurs sans mémoire** qui pilotent une API LLM cloud. Rune est l'inverse : un **agent avec un état cognitif persistant** qui tourne **entièrement en local sur des modèles open-weights**, décide lui-même de ce qui mérite d'être mémorisé, et ré-exploite son vécu au fil des sessions.
+La plupart des harnais agentiques sont des **orchestrateurs sans mémoire** qui pilotent une API LLM cloud. Rune est l'inverse : un **agent local sur modèles open-weights** qui exécute des missions outillées (écrire/tester du code, lancer des commandes), apprend des compétences réutilisables au fil des sessions, et coordonne son travail via un tableau noir partagé.
 
 ---
 
 ## Ce que Rune apporte
 
-**1. Une mémoire qui persiste et se hiérarchise.**
-Au lieu d'une simple fenêtre de contexte, Rune maintient plusieurs étages complémentaires :
-
-- **MHN** (Modern Hopfield Network) — mémoire épisodique associative, rappel par énergie.
-- **KG** (Knowledge Graph) — faits et relations extraits, requêtables.
-- **Chroma** — mémoire sémantique vectorielle avec RAG hybride + reranking, et désormais un **cycle de vie** (création -> l'accès protège de l'oubli -> purge des chunks non consultés ; les souvenirs consolidés sont permanents).
-
-**2. Un cycle cognitif inspiré des neurosciences.**
-Chaque échange traverse : encodage -> calcul de *surprise* -> rappel mémoire ciblé -> génération -> consolidation (micro-sleep). La consolidation promeut les souvenirs marquants de l'épisodique (MHN) vers le sémantique permanent (Chroma), comme un sharp-wave ripple.
-
-**3. Un auto-apprentissage de compétences (AutoSkill).**
+**1. Un auto-apprentissage de compétences (AutoSkill).**
 Quand un échange révèle une **méthode réutilisable** (résoudre un type de problème), Rune en extrait un *skill* structuré (déclencheur, approche, validation, anti-patterns), le persiste, et le réinjecte quand une situation similaire se présente. Un filtre à deux couches (heuristique + jugement LLM) évite de transformer une simple conversation en compétence. Des garde-fous anti-injection protègent le contenu réinjecté dans le prompt.
+
+**2. Une exécution agentique outillée.**
+Rune ne se contente pas de générer du texte : il **agit**. Boucle ReAct plan → action → observation, avec des outils réels (écriture de fichiers, exécution de tests pytest, commandes shell sandboxées, recherche web). Des garde-fous encadrent l'exécution : détection de boucle avec redirection, blocage des commandes non autorisées, venv isolé par mission. Les sous-agents permettent de déléguer une tâche ponctuelle à un modèle dédié.
+
+**3. Un tableau noir partagé (blackboard) + un knowledge graph à jour.**
+Chaque mission écrit son déroulé dans un blackboard structuré (sections, succès/échecs/notes) persisté pour l'audit. En parallèle, un **KG** (Knowledge Graph) extrait les faits d'une conversation et les tient à jour : un fait fonctionnel récent périme l'ancien (changer d'employeur met à jour la réponse, sans doublon).
 
 **4. Le tout en local, sans dépendance cloud obligatoire.**
 Modèles open-weights (Qwen, Mistral, Gemma, Phi, LFM...), quantification 4-bit NF4, chargement paresseux. Aucune clé API requise pour le fonctionnement de base. Une cascade optionnelle vers des modèles cloud existe mais est **désactivée par défaut**.
+
+> **Note sur la mémoire.** Rune est bâti sur le socle cognitif de Lythéa (mémoire multi-étages : épisodique, sémantique vectorielle, graphe de connaissances). Ce qui est **actif et utilisé aujourd'hui** : le KG (graphe de connaissances, tenu à jour), la mémoire vectorielle Chroma (RAG hybride + reranking), et les skills. Les étages plus avancés — mémoire associative MHN exploitée à plein, **surprise prédictive**, **codage prédictif** (Friston), consolidation par micro-sleep — sont **présents dans le code mais pas encore mis en service** ; ils sont dormants par défaut et **arriveront dans une prochaine étape** (voir Roadmap). Le cœur de Rune aujourd'hui, c'est l'**agent** : skills, exécution outillée, blackboard, sous-agents.
 
 ---
 
@@ -125,12 +123,14 @@ L'honnêteté sur la maturité est un principe du projet. **« Couvert par les t
 | Brique | Détail |
 |---|---|
 | **Boot complet** | Chargement Hippocampe (MHN, KG, Chroma), modèle open-weights, quantif 4-bit |
-| **Chat cognitif** | Streaming, pipeline encodage->surprise->rappel->génération->consolidation, identité stable |
-| **Mémoire persistante** | MHN + KG + Chroma opérationnels, RAG hybride + reranking + CRAG |
+| **Chat cognitif** | Streaming, rappel mémoire ciblé (KG + Chroma + MHN), identité stable |
+| **Mémoire persistante** | KG + Chroma opérationnels (RAG hybride + reranking + CRAG) ; MHN câblé. *Voir la note sur la mémoire ci-dessus pour les étages avancés à venir.* |
 | **AutoSkill** | Extraction, persistance JSON, réinjection, filtre anti-conversation, garde-fous sécurité |
+| **Blackboard** | Sections par agent (succès/échecs/notes), persistance JSON pour l'audit, suivi live au dashboard |
 | **Rétention Chroma** | Cycle de vie création->accès->purge, consolidés permanents, mode dry-run de sûreté |
 | **KG à jour** | Dédoublonnage des faits + supersession des prédicats fonctionnels (un employeur récent périme l'ancien) |
-| **CLI** | `chat`, `serve`, `status`, `skills`, `dashboard` |
+| **Agent + missions** | Boucle ReAct outillée (fichiers, tests, shell sandboxé), sous-agents, orchestrateur, suivi live |
+| **CLI** | `chat`, `serve`, `status`, `skills`, `dashboard`, `run` |
 
 ### Câblé mais non vérifié en production
 
