@@ -319,9 +319,7 @@ class BootRunner:
         import subprocess
         from pathlib import Path
 
-        from rune.settings import get_settings
-
-        self.state.begin_stage("mcp", details="initialisation…")
+        from rune.settings import get_settings, get_rune_settings
 
         s = get_settings()
         if not getattr(s, "mcp_enabled", True):

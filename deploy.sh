@@ -133,6 +133,7 @@ pip3 install $PIP_FLAGS --quiet --ignore-installed typer 2>&1 | grep -v "^WARNIN
 pip3 install $PIP_FLAGS --quiet \
     "huggingface_hub>=0.24" "tokenizers>=0.22.0,<=0.23.0" regex safetensors einops timm \
     "sse-starlette>=2.0" "rank-bm25>=0.2" ddgs \
+    tiktoken sentencepiece "apscheduler>=3.10" pandas "structlog>=24.1" \
     pytest \
     networkx python-igraph python-louvain leidenalg \
     2>&1 | grep -v "^WARNING\|^\[notice" || true

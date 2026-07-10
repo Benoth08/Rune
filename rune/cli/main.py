@@ -202,6 +202,7 @@ def chat(
         pass
     _warnings.filterwarnings("ignore", message=".*HF_TOKEN.*")
     _warnings.filterwarnings("ignore", message=".*unauthenticated requests.*")
+    _warnings.filterwarnings("ignore", message=".*resume_download.*")
 
     console.print("[green]Prêt.[/] Tape /quit pour sortir.\n")
 

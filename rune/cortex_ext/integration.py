@@ -338,10 +338,25 @@ class RuneCortex:
                 log.warning("Failed to build HotContext: %s", exc)
                 hot_context_dict = None
 
+        # ── Résout le modèle à passer au sous-agent ───────────────────
+        # Sans model_id, le subprocess tombe sur MockBackend (réponses
+        # génériques, aucun calcul réel). En mode non-lightweight, le
+        # parent a déjà un modèle chargé (self.hippocampe.model) : on le
+        # transmet pour que le sous-agent réponde vraiment. Trinity peut
+        # surcharger via set_trinity_worker_model_id (géré dans le spawner).
+        parent_model_id: str | None = None
+        try:
+            _m = getattr(self.hippocampe, "model", None)
+            if _m is not None:
+                parent_model_id = getattr(_m, "model_id", None)
+        except Exception:
+            parent_model_id = None
+
         # ── Lance le sous-agent ────────────────────────────────────────
         result = self.subagent_spawner.run(
             task=task,
             context=context,
+            model_id=parent_model_id,
             hot_context=hot_context_dict,
             blackboard_path=blackboard_path,
             blackboard_section=blackboard_section,

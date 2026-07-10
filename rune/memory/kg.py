@@ -170,10 +170,18 @@ class EntityExtractor:
             log.info("GLiNER loaded: %s", self._model_name)
         except Exception as exc:
             self._load_failed = True
+            # Message distingue "pas installé" de "installé mais échoue au
+            # chargement" (ex: tokenizer SentencePiece nécessitant le
+            # paquet sentencepiece, ou conflit de version transformers).
+            import importlib.util
+            if importlib.util.find_spec("gliner") is None:
+                hint = "paquet absent — `pip install gliner`"
+            else:
+                hint = f"installé mais chargement échoué : {exc}"
             log.warning(
                 "GLiNER indisponible (%s) — extraction d'entités désactivée "
-                "pour cette session. `pip install gliner` pour l'activer.",
-                type(exc).__name__,
+                "pour cette session (%s).",
+                type(exc).__name__, hint,
             )
 
     def extract(self, text: str) -> list[dict]:
