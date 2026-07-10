@@ -46,8 +46,8 @@ Quand un échange révèle une **méthode réutilisable** (résoudre un type de 
 **2. Une exécution agentique outillée.**
 Rune ne se contente pas de générer du texte : il **agit**. Boucle ReAct plan → action → observation, avec des outils réels (écriture de fichiers, exécution de tests pytest, commandes shell sandboxées, recherche web). Des garde-fous encadrent l'exécution : détection de boucle avec redirection, blocage des commandes non autorisées, venv isolé par mission. Les sous-agents permettent de déléguer une tâche ponctuelle à un modèle dédié.
 
-**3. Un tableau noir partagé (blackboard) + un knowledge graph à jour.**
-Chaque mission écrit son déroulé dans un blackboard structuré (sections, succès/échecs/notes) persisté pour l'audit. En parallèle, un **KG** (Knowledge Graph) extrait les faits d'une conversation et les tient à jour : un fait fonctionnel récent périme l'ancien (changer d'employeur met à jour la réponse, sans doublon).
+**3. Un tableau noir partagé (blackboard).**
+Chaque mission écrit son déroulé dans un blackboard structuré (sections par agent, succès/échecs/notes) persisté sur disque pour l'audit, et suivi en direct dans le dashboard. C'est la mémoire de travail d'une mission : ce qui a été tenté, ce qui a réussi ou échoué, les notes laissées en cours de route. À chaque run, l'agent distille aussi une **leçon réutilisable** (déclencheur → approche) rangée dans une mémoire procédurale partagée entre le chat et l'agent, pour s'améliorer sur des tâches similaires.
 
 **4. Le tout en local, sans dépendance cloud obligatoire.**
 Modèles open-weights (Qwen, Mistral, Gemma, Phi, LFM...), quantification 4-bit NF4, chargement paresseux. Aucune clé API requise pour le fonctionnement de base. Une cascade optionnelle vers des modèles cloud existe mais est **désactivée par défaut**.

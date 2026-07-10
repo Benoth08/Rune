@@ -616,6 +616,12 @@ def _record_event(run: "_Run", ev: dict) -> None:
             entry["hint"] = f"{len(steps)} étapes"
         elif etype == "synthesis":
             entry["hint"] = "synthèse produite"
+        elif etype == "lesson_learned":
+            # Leçon réutilisable distillée du run, sauvée en mémoire
+            # procédurale partagée (chat+agent). C'est l'équivalent d'un
+            # « skill appris » côté mission — on l'affiche au dashboard.
+            trig = ev.get("trigger", "") or ev.get("text", "")
+            entry["hint"] = str(trig)[:70]
         elif etype in ("run_done", "run_stopped"):
             run.done = True
         elif etype == "run_start":

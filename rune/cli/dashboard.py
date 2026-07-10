@@ -262,6 +262,7 @@ def render_logs(status: dict[str, Any]) -> Panel:
             "critique": ("✎", "yellow"),
             "deliberation": ("…", "dim"),
             "synthesis": ("★", "magenta"),
+            "lesson_learned": ("🎓", "green"),
             "run_done": ("■", "green"),
             "run_stopped": ("■", "red"),
         }
@@ -276,6 +277,18 @@ def render_logs(status: dict[str, Any]) -> Panel:
             tool = e.get("tool", "")
             hint = e.get("hint", "")
             label = tool or etype
+            # Libellés lisibles pour les events sans outil.
+            _labels = {
+                "lesson_learned": "leçon apprise",
+                "synthesis": "synthèse",
+                "run_done": "terminé",
+                "run_stopped": "arrêté",
+                "run_start": "démarrage",
+                "agent_warning": "alerte",
+                "critique": "critique",
+                "plan": "plan",
+            }
+            label = tool or _labels.get(etype, etype)
             line = Text(f"{t:>5.1f}s ", style="dim") + Text(f"{icon} ", style=style)
             line += Text(f"{label}", style=style)
             if hint:
