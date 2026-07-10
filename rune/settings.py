@@ -625,7 +625,14 @@ class RuneSettings(BaseSettings):
     # ── Auto-install Node.js pour MCP ─────────────────────────────
     # true (défaut) : tente d'installer Node via apt/brew si manquant.
     # false : skip silencieux, MCP désactivé si Node absent.
-    auto_install_node: bool = Field(default=True)
+    # V0.1.1 — désactivé par défaut. L'auto-install de Node.js pendant le
+    # boot (via NodeSource/apt) nécessite root + accès réseau à
+    # deb.nodesource.com, souvent bloqué par le firewall d'egress des
+    # pods. En cas d'échec réseau, le curl|bash pouvait bloquer le boot
+    # plusieurs minutes → serveur en 503 permanent, dashboard injoignable.
+    # MCP est optionnel : mieux vaut le skipper proprement que bloquer le
+    # boot. Mettre à True explicitement si tu veux l'auto-install.
+    auto_install_node: bool = Field(default=False)
 
     # ── Trinity (pool multi-modèles) ───────────────────────────────
     # Chemin vers le fichier trinity.yaml. Vide = Trinity désactivé.
