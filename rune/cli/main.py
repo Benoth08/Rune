@@ -56,7 +56,7 @@ console = Console()
 log = logging.getLogger("rune.cli")
 
 
-def _build_rune():
+def _build_rune(model_id: str | None = None):
     """Construit RuneCortex complet (Hippocampe Lythea + extensions).
 
     Cette fonction est lourde — elle instancie Hippocampe avec SDM, MHN,
@@ -66,6 +66,11 @@ def _build_rune():
     et monkey-patche hippocampe.process_message. On réutilise ce RuneCortex
     au lieu d'en créer un second (évite le double traitement AutoSkill /
     FailureMemory par message, et la double boucle de consolidation).
+
+    Si ``model_id`` est fourni, le modèle est chargé dans l'Hippocampe.
+    C'est indispensable pour les subagents non-lightweight : sans modèle
+    parent chargé, run_subagent ne peut transmettre aucun model_id au
+    sous-agent, qui tombe alors sur MockBackend (réponses génériques).
     """
     from rune.server.app import LytheaApp
 
@@ -78,6 +83,23 @@ def _build_rune():
         # On en crée un minimal pour que le CLI reste utilisable.
         from rune.cortex_ext.integration import RuneCortex
         rune = RuneCortex(lythea_app.hippocampe)
+
+    # Charge le modèle si demandé (subagents non-lightweight en ont besoin).
+    if model_id:
+        try:
+            if getattr(lythea_app.model, "model_id", None) != model_id:
+                console.print(
+                    f"[cyan]Chargement du modèle {model_id}…[/] "
+                    f"[dim](nécessaire pour le sous-agent)[/]"
+                )
+                lythea_app.model.load(model_id)
+                console.print(f"[green]Modèle chargé : {model_id}[/]")
+        except Exception as exc:
+            console.print(
+                f"[red]Échec du chargement de {model_id} : {exc}[/]\n"
+                f"[yellow]Le sous-agent utilisera un MockBackend "
+                f"(réponses génériques).[/]"
+            )
 
     return rune, lythea_app
 
@@ -310,7 +332,29 @@ def run(
         console.print_json(data=result.as_dict())
     else:
         console.print("[cyan]Boot Hippocampe…[/]")
-        rune, _ = _build_rune()
+        from rune.config import DEFAULT_MODEL
+        rune, lythea_app = _build_rune()
+        # _build_rune() ne charge AUCUN modèle : sans ça, le sous-agent
+        # reçoit model_id=None et tombe sur MockBackend (réponses
+        # génériques). On charge donc le modèle sur le parent, comme le
+        # fait `rune chat`, pour que run_subagent transmette un vrai
+        # model_id au sous-agent.
+        resolved = effective_model or DEFAULT_MODEL
+        already = getattr(getattr(lythea_app, "model", None), "model_id", None)
+        if resolved and already != resolved:
+            console.print(
+                f"[cyan]Chargement du modèle {resolved}…[/] "
+                f"(peut prendre 1-3 min au 1er lancement)"
+            )
+            try:
+                lythea_app.model.load(resolved)
+                console.print(f"[green]Modèle chargé : {resolved}[/]")
+            except Exception as exc:
+                console.print(
+                    f"[red]Échec du chargement de {resolved} : {exc}[/]\n"
+                    f"[yellow]Le sous-agent tombera sur MockBackend "
+                    f"(réponses génériques).[/]"
+                )
         result = rune.run_subagent(task=task, context=context, timeout=timeout)
         console.print_json(data=result)
 
