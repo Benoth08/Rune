@@ -233,6 +233,10 @@ class LytheaSettings(BaseSettings):
     agent_ollama_workers: list[str] = Field(default_factory=list)
     agent_ollama_base_url: str = Field(default="")
     microsleep_inactivity: int = Field(default=180, ge=10, le=86400)
+    # V5.9 chantier 3 — délai d'inactivité (s) avant un deep_sleep
+    # automatique. 30 min par défaut. Sans ce timer, le deep_sleep (et
+    # donc le GC de rétention Chroma) ne se déclenchait que manuellement.
+    deep_sleep_inactivity: int = Field(default=1800, ge=60, le=604800)
     microsleep_rehearse_k: int = Field(default=16, ge=1, le=1024)
     microsleep_boost: float = Field(default=0.15, ge=0.0, le=10.0)
 
@@ -497,6 +501,11 @@ class LytheaSettings(BaseSettings):
     # mode). When False, decisions are computed for telemetry but
     # ignored — safer default while validating the predictor.
     pc_apply_gating: bool = Field(default=False)
+    # V5.9 — poids du signal SDM (surprise prédictive) dans l'erreur de
+    # gating du predictive coding. 0 = EMA seule (off). > 0 mélange la
+    # lecture SDM ; sert de juge d'ablation pour mesurer si la SDM
+    # (actuellement inerte) apporte de la variance discriminante.
+    pc_gating_w_sdm: float = Field(default=0.0, ge=0.0, le=1.0)
 
     # ── V4.3: Timeline (narrative chronology extraction) ───────────────
     enable_timeline: bool = Field(default=False)

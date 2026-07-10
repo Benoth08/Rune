@@ -413,6 +413,7 @@ class Hippocampe:
                         low_threshold=s.pc_low_threshold,
                         high_threshold=s.pc_high_threshold,
                         confidence_cap=s.pc_confidence_cap,
+                        gating_w_sdm=getattr(s, "pc_gating_w_sdm", 0.0),
                     )
                 )
             except Exception:
@@ -645,6 +646,7 @@ class Hippocampe:
                             low_threshold=s.pc_low_threshold,
                             high_threshold=s.pc_high_threshold,
                             confidence_cap=s.pc_confidence_cap,
+                            gating_w_sdm=getattr(s, "pc_gating_w_sdm", 0.0),
                         )
                     )
                 elif not enabled:
@@ -1040,7 +1042,9 @@ class Hippocampe:
                             emb_list = list(emb_obj)
                         except Exception:
                             emb_list = None
-                self._last_gating_decision = self._predictive_coding.observe(emb_list)
+                self._last_gating_decision = self._predictive_coding.observe(
+                    emb_list, sdm_error=surprise.get("predictive")
+                )
             except Exception:
                 log.exception("V4 hook A.3 (predictive_coding) failed")
                 self._last_gating_decision = None

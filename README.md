@@ -129,6 +129,7 @@ L'honnêteté sur la maturité est un principe du projet. **« Couvert par les t
 | **Mémoire persistante** | MHN + KG + Chroma opérationnels, RAG hybride + reranking + CRAG |
 | **AutoSkill** | Extraction, persistance JSON, réinjection, filtre anti-conversation, garde-fous sécurité |
 | **Rétention Chroma** | Cycle de vie création->accès->purge, consolidés permanents, mode dry-run de sûreté |
+| **KG à jour** | Dédoublonnage des faits + supersession des prédicats fonctionnels (un employeur récent périme l'ancien) |
 | **CLI** | `chat`, `serve`, `status`, `skills`, `dashboard` |
 
 ### Câblé mais non vérifié en production
@@ -147,7 +148,7 @@ L'honnêteté sur la maturité est un principe du projet. **« Couvert par les t
 | **Cascade Claude/Gemini** | Désactivée par défaut (`enable_cascade=False`) — nécessite des clés API |
 | **Recherche web** | Chaîne composite en place (SearXNG -> DDG...) mais SearXNG public peu fiable ; recommandé : clé Tavily/Serper |
 | **Predictive coding** (Friston) | Désactivé par défaut |
-| **SDM / surprise prédictive** | Inerte — sous-système en cours de ré-évaluation (câblage causal insuffisant) |
+| **SDM / surprise prédictive** | Inerte — mais un *juge d'ablation* est câblé (`pc_gating_w_sdm`, off par défaut) pour mesurer si le signal SDM apporte de la variance discriminante avant de trancher |
 
 ---
 

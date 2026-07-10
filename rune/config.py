@@ -187,6 +187,21 @@ CATALOG: dict[str, ModelSpec] = {
     # Modèles avec raisonnement explicite intégré. Le toggle "Réflexion"
     # de l'UI est ignoré (le modèle pense de toute façon). Température
     # plus basse (0.6) pour stabiliser la trace de raisonnement.
+    "deepreinforce-ai/Ornith-1.0-9B": ModelSpec(
+        model_id="deepreinforce-ai/Ornith-1.0-9B",
+        label="Ornith-1.0-9B (Thinking)",
+        size_gb=19.0,            # dense ~9B bf16 ; quant_4bit=True -> ~6 Go
+        is_thinking=True,
+        notes=("Modèle de raisonnement (deepreinforce-ai, 2026) : bloc <think> "
+               "natif + tool-calling (format qwen3_xml), contexte 128K, base "
+               "Qwen3.5. Dense ~9B, tient sur un seul GPU. Peut exiger "
+               "trust_remote_code au chargement. Modèle THINKING : vérifier la "
+               "compat avec agent ReAct (le bloc <think> peut gêner le format "
+               "des outils). Sur 24 Go serrés, passer quant_4bit=True (~6 Go)."),
+        sampling=SamplingProfile(
+            temperature=0.6, top_p=0.95, top_k=20, repetition_penalty=1.0,
+        ),
+    ),
     "Qwen/Qwen3-4B": ModelSpec(
         model_id="Qwen/Qwen3-4B",
         label="Qwen3-4B (Thinking)",
@@ -551,6 +566,8 @@ WEB_STABILITY_THRESHOLD = _settings.web_stability_threshold
 # Microsleep
 MICROSLEEP_INTERVAL = _settings.microsleep_interval
 MICROSLEEP_INACTIVITY = _settings.microsleep_inactivity
+# V5.9 chantier 3 — deep sleep automatique après inactivité prolongée.
+DEEP_SLEEP_INACTIVITY = _settings.deep_sleep_inactivity
 MICROSLEEP_REHEARSE_K = _settings.microsleep_rehearse_k
 MICROSLEEP_BOOST = _settings.microsleep_boost
 

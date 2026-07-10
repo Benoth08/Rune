@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" font-family="'JetBrains Mono','Consolas',ui-monospace,monospace">
+  <defs>
+    <linearGradient id="bgd" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1117"/>
+      <stop offset="1" stop-color="#090c11"/>
+    </linearGradient>
+    <filter id="softd" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <rect width="1000" height="620" fill="url(#bgd)"/>
+
+  <!-- window chrome -->
+  <rect x="16" y="16" width="968" height="588" rx="10" fill="#0b0e13" stroke="#20262f" stroke-width="1.4"/>
+  <circle cx="42" cy="40" r="6" fill="#ff5f56"/>
+  <circle cx="62" cy="40" r="6" fill="#ffbd2e"/>
+  <circle cx="82" cy="40" r="6" fill="#27c93f"/>
+  <text x="500" y="44" text-anchor="middle" fill="#5a6572" font-size="12">rune dashboard — live</text>
+
+  <!-- header banner -->
+  <rect x="36" y="64" width="928" height="72" rx="8" fill="#0e131b" stroke="#1c2530" stroke-width="1.2"/>
+  <text x="52" y="86" fill="#39d0c8" font-size="11" font-weight="700" letter-spacing="1">R U N E</text>
+  <text x="52" y="104" fill="#2a8f89" font-size="9">cognitive agent · headless · open-weights</text>
+  <text x="948" y="90" text-anchor="end" fill="#c8d3e4" font-size="12" font-weight="700">Rune v0.1.0</text>
+  <text x="948" y="108" text-anchor="end" fill="#8895ac" font-size="10.5">Trinity: OFF (single-model) · 19:04:09</text>
+  <rect x="52" y="116" width="10" height="10" rx="2" fill="#27c93f"/>
+  <text x="70" y="125" fill="#7c889c" font-size="10">serveur : prêt</text>
+
+  <!-- LEFT COLUMN -->
+  <!-- Mission -->
+  <g filter="url(#softd)"><rect x="36" y="148" width="560" height="86" rx="8" fill="#0e131b" stroke="#2f5fa0" stroke-width="1.3"/></g>
+  <text x="48" y="167" fill="#5f8fd0" font-size="10.5" font-weight="700">MISSION COURANTE</text>
+  <text x="48" y="189" fill="#cdd8e8" font-size="11.5">Task  : Analyser le fichier de logs applicatif</text>
+  <text x="48" y="207" fill="#e0c060" font-size="11.5">Phase : retrieval → qwen2.5-7b</text>
+  <text x="48" y="225" fill="#7c889c" font-size="11">Elapsed : 2.4s   |   Tokens : 312</text>
+
+  <!-- Subagents -->
+  <g filter="url(#softd)"><rect x="36" y="246" width="560" height="112" rx="8" fill="#0e131b" stroke="#a04fd0" stroke-width="1.3"/></g>
+  <text x="48" y="265" fill="#b06fe0" font-size="10.5" font-weight="700">SUBAGENTS</text>
+  <text x="48" y="286" fill="#6b7688" font-size="10.5">#   Section          Statut     Modèle</text>
+  <line x1="48" y1="292" x2="584" y2="292" stroke="#20262f" stroke-width="1"/>
+  <text x="48" y="309" fill="#cdd8e8" font-size="10.5">1   analyse_logs     </text>
+  <text x="240" y="309" fill="#27c93f" font-size="10.5">✓ done</text>
+  <text x="360" y="309" fill="#7c889c" font-size="10.5">qwen2.5-7b</text>
+  <text x="48" y="329" fill="#cdd8e8" font-size="10.5">2   synthèse         </text>
+  <text x="240" y="329" fill="#e0c060" font-size="10.5">⟳ run</text>
+  <text x="360" y="329" fill="#7c889c" font-size="10.5">qwen2.5-7b</text>
+  <text x="48" y="349" fill="#cdd8e8" font-size="10.5">3   validation       </text>
+  <text x="240" y="349" fill="#5a6572" font-size="10.5">· idle</text>
+  <text x="360" y="349" fill="#7c889c" font-size="10.5">—</text>
+
+  <!-- Blackboard -->
+  <g filter="url(#softd)"><rect x="36" y="370" width="560" height="112" rx="8" fill="#0e131b" stroke="#2fae5f" stroke-width="1.3"/></g>
+  <text x="48" y="389" fill="#4fce7f" font-size="10.5" font-weight="700">BLACKBOARD</text>
+  <text x="48" y="410" fill="#6b7688" font-size="10.5">Section        Wins  Fails  Notes  Statut</text>
+  <line x1="48" y1="416" x2="584" y2="416" stroke="#20262f" stroke-width="1"/>
+  <text x="48" y="433" fill="#7c889c" font-size="10.5">_contract      —     —      —     </text>
+  <text x="330" y="433" fill="#8895ac" font-size="10.5" font-style="italic">objectif défini</text>
+  <text x="48" y="453" fill="#cdd8e8" font-size="10.5">analyse_logs   </text>
+  <text x="185" y="453" fill="#27c93f" font-size="10.5">3</text>
+  <text x="235" y="453" fill="#ff5f56" font-size="10.5">0</text>
+  <text x="290" y="453" fill="#e0c060" font-size="10.5">1</text>
+  <text x="330" y="453" fill="#4fce7f" font-size="10.5">validé</text>
+  <text x="48" y="473" fill="#cdd8e8" font-size="10.5">synthèse       </text>
+  <text x="185" y="473" fill="#27c93f" font-size="10.5">1</text>
+  <text x="235" y="473" fill="#ff5f56" font-size="10.5">0</text>
+  <text x="290" y="473" fill="#e0c060" font-size="10.5">0</text>
+  <text x="330" y="473" fill="#e0c060" font-size="10.5">en cours</text>
+
+  <!-- RIGHT COLUMN -->
+  <!-- Memory -->
+  <g filter="url(#softd)"><rect x="612" y="148" width="352" height="120" rx="8" fill="#0e131b" stroke="#1f9c93" stroke-width="1.3"/></g>
+  <text x="624" y="167" fill="#39d0c8" font-size="10.5" font-weight="700">MÉMOIRE</text>
+  <text x="624" y="190" fill="#8895ac" font-size="11">MHN    </text>
+  <text x="720" y="190" fill="#cdd8e8" font-size="11">128 / 512  patterns</text>
+  <text x="624" y="210" fill="#8895ac" font-size="11">KG     </text>
+  <text x="720" y="210" fill="#cdd8e8" font-size="11">87 entités · 143 relations</text>
+  <text x="624" y="230" fill="#8895ac" font-size="11">Chroma </text>
+  <text x="720" y="230" fill="#cdd8e8" font-size="11">1 204 chunks</text>
+  <text x="624" y="250" fill="#8895ac" font-size="11">Skills </text>
+  <text x="720" y="250" fill="#cdd8e8" font-size="11">2 actifs · 1 fiable</text>
+
+  <!-- Metacognition -->
+  <g filter="url(#softd)"><rect x="612" y="280" width="352" height="118" rx="8" fill="#0e131b" stroke="#e0a53f" stroke-width="1.3"/></g>
+  <text x="624" y="299" fill="#f0b850" font-size="10.5" font-weight="700">MÉTACOGNITION</text>
+  <text x="624" y="322" fill="#8895ac" font-size="11">Doute      </text>
+  <text x="740" y="322" fill="#4fce7f" font-size="11">0.18  (certaine)</text>
+  <text x="624" y="342" fill="#8895ac" font-size="11">Surprise   </text>
+  <text x="740" y="342" fill="#cdd8e8" font-size="11">0.42</text>
+  <text x="740" y="362" fill="#7c889c" font-size="10">struct 0.31 · épisod 0.55</text>
+  <text x="740" y="380" fill="#7c889c" font-size="10">prédict —   · chroma −0.12</text>
+  <text x="624" y="380" fill="#5a6572" font-size="10">SDM inerte</text>
+
+  <!-- Skills -->
+  <g filter="url(#softd)"><rect x="612" y="410" width="352" height="84" rx="8" fill="#0e131b" stroke="#2fae5f" stroke-width="1.3"/></g>
+  <text x="624" y="429" fill="#4fce7f" font-size="10.5" font-weight="700">SKILLS ACTIFS</text>
+  <text x="624" y="450" fill="#6b7688" font-size="10">ID          Trigger          Succ  Conf</text>
+  <text x="624" y="468" fill="#cdd8e8" font-size="10">skill_e9d9  débug segfault…    5   0.87</text>
+  <text x="624" y="484" fill="#cdd8e8" font-size="10">skill_20de  requête SQL join   1   0.70</text>
+
+  <!-- Logs full width -->
+  <g filter="url(#softd)"><rect x="36" y="502" width="928" height="88" rx="8" fill="#0e131b" stroke="#2f3d5c" stroke-width="1.2"/></g>
+  <text x="48" y="521" fill="#8895ac" font-size="10.5" font-weight="700">LOGS</text>
+  <text x="48" y="540" fill="#6b7688" font-size="10.5">19:04:07  </text>
+  <text x="150" y="540" fill="#7c889c" font-size="10.5">Retention GC: 0 stale chunks (dry-run)</text>
+  <text x="48" y="558" fill="#6b7688" font-size="10.5">19:04:08  </text>
+  <text x="150" y="558" fill="#5fd68a" font-size="10.5">Skill applied: skill_e9d951ad53af (conf 0.87)</text>
+  <text x="48" y="576" fill="#6b7688" font-size="10.5">19:04:09  </text>
+  <text x="150" y="576" fill="#b28ee8" font-size="10.5">Consolidation: 2 patterns promoted → Chroma</text>
+</svg>

@@ -119,6 +119,14 @@ class KGRelation:
     object_id: str
     confidence: float = 0.5
     source_doc: str = ""
+    created_ts: float = 0.0  # V5.9 — départage par récence
+    superseded: bool = False  # V5.9 — fait périmé (maj) → ignoré au retrieval
+
+
+# V5.9 — prédicats fonctionnels (mono-valués) : un nouveau fait périme
+# l'ancien (changement d'employeur, de ville). Les autres (projets,
+# produits, compétences) sont multi-valués et s'accumulent.
+_FUNCTIONAL_PREDICATES = frozenset({"travaille_chez", "vit_à"})
 
 
 class EntityExtractor:
@@ -507,6 +515,22 @@ class KnowledgeGraphStore:
         source: str = "",
     ) -> str:
         """Add a relation between entities."""
+        now = time.time()
+        # V5.9 — dédoublonnage exact : même (sujet, prédicat, objet) → on
+        # rafraîchit l'existante au lieu de créer un doublon.
+        for r in self.relations.values():
+            if (not r.superseded and r.subject_id == subject_id
+                    and r.predicate == predicate and r.object_id == object_id):
+                r.created_ts = now
+                r.confidence = min(1.0, r.confidence + 0.05)
+                return r.rel_id
+        # V5.9 — supersession des prédicats fonctionnels : un nouveau fait
+        # périme l'ancien (ex : changement d'employeur / de ville).
+        if predicate in _FUNCTIONAL_PREDICATES:
+            for r in self.relations.values():
+                if (not r.superseded and r.subject_id == subject_id
+                        and r.predicate == predicate):
+                    r.superseded = True
         rid = f"r_{uuid.uuid4().hex[:8]}"
         self.relations[rid] = KGRelation(
             rel_id=rid,
@@ -515,6 +539,7 @@ class KnowledgeGraphStore:
             object_id=object_id,
             confidence=confidence,
             source_doc=source,
+            created_ts=now,
         )
         return rid
 
@@ -556,6 +581,8 @@ class KnowledgeGraphStore:
 
         facts: list[str] = []
         for rid, rel in self.relations.items():
+            if rel.superseded:  # V5.9 — on ignore les faits périmés
+                continue
             if rel.subject_id in entity_ids or rel.object_id in entity_ids:
                 subj = self.entities.get(rel.subject_id)
                 obj = self.entities.get(rel.object_id)

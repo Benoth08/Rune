@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" font-family="'Segoe UI',system-ui,-apple-system,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f1420"/>
+      <stop offset="1" stop-color="#0b0f18"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6b82"/>
+    </marker>
+    <marker id="arrowGold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e0a53f"/>
+    </marker>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1000" height="640" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="500" y="48" text-anchor="middle" fill="#e8edf4" font-size="27" font-weight="700">Le cycle cognitif de Rune</text>
+  <text x="500" y="74" text-anchor="middle" fill="#7b8aa0" font-size="14">Chaque message traverse cinq phases, en boucle — inspiration neurosciences (hippocampe)</text>
+
+  <!-- Ring guide -->
+  <circle cx="500" cy="360" r="205" fill="none" stroke="#26314a" stroke-width="1.5" stroke-dasharray="4 6"/>
+
+  <!-- Central hub -->
+  <circle cx="500" cy="360" r="70" fill="#141b2b" stroke="#2f3d5c" stroke-width="1.5" filter="url(#soft)"/>
+  <text x="500" y="352" text-anchor="middle" fill="#c8d3e4" font-size="16" font-weight="700">Hippocampe</text>
+  <text x="500" y="374" text-anchor="middle" fill="#6f7f97" font-size="12">orchestrateur</text>
+
+  <!-- Nodes on the ring (5 phases) -->
+  <!-- 1 Encodage (top) -->
+  <g filter="url(#soft)">
+    <rect x="410" y="92" width="180" height="66" rx="14" fill="#0e2b2e" stroke="#1f9c93" stroke-width="1.6"/>
+  </g>
+  <text x="500" y="120" text-anchor="middle" fill="#54e0d0" font-size="16" font-weight="700">1 · Encodage</text>
+  <text x="500" y="140" text-anchor="middle" fill="#8fbfba" font-size="11.5">texte → latents + salience</text>
+
+  <!-- 2 Surprise (right-top) -->
+  <g filter="url(#soft)">
+    <rect x="748" y="212" width="188" height="66" rx="14" fill="#2e2410" stroke="#e0a53f" stroke-width="1.6"/>
+  </g>
+  <text x="842" y="240" text-anchor="middle" fill="#f2c877" font-size="16" font-weight="700">2 · Surprise</text>
+  <text x="842" y="260" text-anchor="middle" fill="#cfae7a" font-size="11.5">composite + doute</text>
+
+  <!-- 3 Rappel (right-bottom) -->
+  <g filter="url(#soft)">
+    <rect x="720" y="452" width="196" height="66" rx="14" fill="#0d1f38" stroke="#3f7fd0" stroke-width="1.6"/>
+  </g>
+  <text x="818" y="480" text-anchor="middle" fill="#77a8ec" font-size="16" font-weight="700">3 · Rappel</text>
+  <text x="818" y="500" text-anchor="middle" fill="#8fa9cf" font-size="10.5">KG + MHN + Chroma → RAG/CRAG</text>
+
+  <!-- 4 Génération (left-bottom) -->
+  <g filter="url(#soft)">
+    <rect x="84" y="452" width="188" height="66" rx="14" fill="#0e2617" stroke="#2fae5f" stroke-width="1.6"/>
+  </g>
+  <text x="178" y="480" text-anchor="middle" fill="#5fd68a" font-size="16" font-weight="700">4 · Génération</text>
+  <text x="178" y="500" text-anchor="middle" fill="#8fc7a3" font-size="11.5">réponse (streaming)</text>
+
+  <!-- 5 Consolidation (left-top) -->
+  <g filter="url(#soft)">
+    <rect x="64" y="212" width="196" height="66" rx="14" fill="#221733" stroke="#8f5fd0" stroke-width="1.6"/>
+  </g>
+  <text x="162" y="240" text-anchor="middle" fill="#b28ee8" font-size="16" font-weight="700">5 · Consolidation</text>
+  <text x="162" y="260" text-anchor="middle" fill="#b09fce" font-size="11.5">micro-sleep · MHN → Chroma</text>
+
+  <!-- Curved arrows around the ring (clockwise) -->
+  <!-- Enc -> Surprise -->
+  <path d="M 590 138 A 205 205 0 0 1 792 218" fill="none" stroke="#5b6b82" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <!-- Surprise -> Rappel -->
+  <path d="M 852 280 A 205 205 0 0 1 852 452" fill="none" stroke="#5b6b82" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <!-- Rappel -> Génération -->
+  <path d="M 718 502 A 205 205 0 0 1 274 502" fill="none" stroke="#5b6b82" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <!-- Génération -> Consolidation -->
+  <path d="M 148 452 A 205 205 0 0 1 148 280" fill="none" stroke="#5b6b82" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <!-- Consolidation -> Encodage (close the loop) -->
+  <path d="M 208 218 A 205 205 0 0 1 410 138" fill="none" stroke="#5b6b82" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+  <!-- Surprise modulation callouts (gold, dashed) -->
+  <path d="M 842 280 C 800 380 640 430 572 400" fill="none" stroke="#e0a53f" stroke-width="1.8" stroke-dasharray="5 5" marker-end="url(#arrowGold)"/>
+  <text x="882" y="470" text-anchor="middle" fill="#e0a53f" font-size="11" font-style="italic">module l'écriture</text>
+  <text x="882" y="485" text-anchor="middle" fill="#e0a53f" font-size="11" font-style="italic">&amp; déclenche les ripples</text>
+
+  <!-- Surprise formula box -->
+  <g filter="url(#soft)">
+    <rect x="330" y="560" width="340" height="58" rx="10" fill="#161b28" stroke="#2f3d5c" stroke-width="1.2"/>
+  </g>
+  <text x="500" y="582" text-anchor="middle" fill="#c8d3e4" font-size="12.5" font-weight="600">S = 0.40·structurelle + 0.35·épisodique + 0.25·prédictive</text>
+  <text x="500" y="602" text-anchor="middle" fill="#8895ac" font-size="11.5">S_global = S × (1 − discount Chroma)   ·   prédictive inerte (SDM)</text>
+</svg>

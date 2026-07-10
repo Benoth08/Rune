@@ -52,6 +52,7 @@ from rune.config import (
     MHN_DIR,
     MICROSLEEP_BOOST,
     MICROSLEEP_INACTIVITY,
+    DEEP_SLEEP_INACTIVITY,
     MICROSLEEP_INTERVAL,
     MICROSLEEP_REHEARSE_K,
     SDM_DIR,
@@ -114,6 +115,11 @@ class ConsolidationPhase:
         self._microsleep_lock = threading.Lock()
         self._microsleep_pending: bool = False
         self._inactivity_timer: threading.Timer | None = None
+        # V5.9 chantier 3 — second timer, plus long, pour un deep_sleep
+        # automatique quand l'utilisateur est absent longtemps. Distinct
+        # du timer microsleep (court). Sans lui, le GC de rétention Chroma
+        # branché sur deep_sleep ne tournerait jamais tout seul.
+        self._deep_sleep_timer: threading.Timer | None = None
         self._last_microsleep_ts: float = time.time()
 
         # The orchestrator updates this through its bookkeeping;
@@ -203,6 +209,28 @@ class ConsolidationPhase:
         self._inactivity_timer.daemon = True
         self._inactivity_timer.start()
 
+        # V5.9 chantier 3 — (ré)arme aussi le timer deep_sleep (plus long).
+        # Un deep_sleep automatique après une absence prolongée déclenche
+        # la consolidation profonde ET le GC de rétention Chroma, qui sinon
+        # ne tourneraient jamais sans intervention manuelle.
+        if self._deep_sleep_timer is not None:
+            self._deep_sleep_timer.cancel()
+        self._deep_sleep_timer = threading.Timer(
+            DEEP_SLEEP_INACTIVITY, self._deep_sleep_on_inactivity,
+        )
+        self._deep_sleep_timer.daemon = True
+        self._deep_sleep_timer.start()
+
+    def _deep_sleep_on_inactivity(self) -> None:
+        """Déclenche un deep_sleep autonome après inactivité prolongée.
+
+        Best-effort et daemon : ne doit jamais faire crasher le process.
+        """
+        try:
+            self.deep_sleep()
+        except Exception:  # pragma: no cover — defensive
+            log.exception("Auto deep sleep (inactivity) failed")
+
     def cancel_inactivity_timer(self) -> None:
         """Cancel any pending inactivity timer.
 
@@ -212,6 +240,10 @@ class ConsolidationPhase:
         if self._inactivity_timer is not None:
             self._inactivity_timer.cancel()
             self._inactivity_timer = None
+        # V5.9 chantier 3 — annuler aussi le timer deep_sleep.
+        if self._deep_sleep_timer is not None:
+            self._deep_sleep_timer.cancel()
+            self._deep_sleep_timer = None
 
     def deep_sleep(self) -> str:
         """Aggressive prune + persist. SDM flushed, MHN preserved.

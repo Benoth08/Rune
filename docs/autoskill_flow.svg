@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" font-family="'Segoe UI',system-ui,-apple-system,sans-serif">
+  <defs>
+    <linearGradient id="bg3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f1420"/>
+      <stop offset="1" stop-color="#0b0f18"/>
+    </linearGradient>
+    <marker id="a3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6b82"/>
+    </marker>
+    <marker id="a3r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d05f7f"/>
+    </marker>
+    <filter id="soft3" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1000" height="600" fill="url(#bg3)"/>
+
+  <text x="500" y="46" text-anchor="middle" fill="#e8edf4" font-size="27" font-weight="700">AutoSkill — auto-apprentissage de compétences</text>
+  <text x="500" y="72" text-anchor="middle" fill="#7b8aa0" font-size="14">Un échange devient une compétence réutilisable — sauf s'il n'est qu'une conversation</text>
+
+  <!-- Step 1: exchange -->
+  <g filter="url(#soft3)">
+    <rect x="40" y="130" width="170" height="72" rx="13" fill="#161b28" stroke="#3d4a66" stroke-width="1.4"/>
+  </g>
+  <text x="125" y="160" text-anchor="middle" fill="#cdd8e8" font-size="15" font-weight="700">Échange réussi</text>
+  <text x="125" y="180" text-anchor="middle" fill="#8895ac" font-size="11">doute bas · réponse validée</text>
+
+  <!-- Filter layer 1 -->
+  <g filter="url(#soft3)">
+    <rect x="255" y="120" width="200" height="92" rx="13" fill="#2e2410" stroke="#e0a53f" stroke-width="1.5"/>
+  </g>
+  <text x="355" y="148" text-anchor="middle" fill="#f2c877" font-size="14" font-weight="700">Filtre 1 — heuristique</text>
+  <text x="355" y="169" text-anchor="middle" fill="#cfae7a" font-size="11.5">écarte salutations,</text>
+  <text x="355" y="185" text-anchor="middle" fill="#cfae7a" font-size="11.5">présentations, small-talk</text>
+  <text x="355" y="203" text-anchor="middle" fill="#a98f5a" font-size="10.5">rapide, sans LLM</text>
+
+  <!-- Filter layer 2 -->
+  <g filter="url(#soft3)">
+    <rect x="500" y="120" width="200" height="92" rx="13" fill="#221733" stroke="#8f5fd0" stroke-width="1.5"/>
+  </g>
+  <text x="600" y="148" text-anchor="middle" fill="#b28ee8" font-size="14" font-weight="700">Filtre 2 — jugement LLM</text>
+  <text x="600" y="169" text-anchor="middle" fill="#b09fce" font-size="11.5">« cet épisode mérite-t-il</text>
+  <text x="600" y="185" text-anchor="middle" fill="#b09fce" font-size="11.5">une compétence ? »</text>
+  <text x="600" y="203" text-anchor="middle" fill="#8f7bb0" font-size="10.5">skip explicite possible</text>
+
+  <!-- Skill object -->
+  <g filter="url(#soft3)">
+    <rect x="745" y="118" width="215" height="96" rx="13" fill="#0e2617" stroke="#2fae5f" stroke-width="1.6"/>
+  </g>
+  <text x="852" y="144" text-anchor="middle" fill="#5fd68a" font-size="14" font-weight="700">Skill structuré</text>
+  <text x="852" y="165" text-anchor="middle" fill="#9ccfb0" font-size="11">déclencheur · approche</text>
+  <text x="852" y="181" text-anchor="middle" fill="#9ccfb0" font-size="11">validation · anti-patterns</text>
+  <text x="852" y="201" text-anchor="middle" fill="#7fae94" font-size="10.5">+ embedding du trigger</text>
+
+  <!-- arrows across the top row -->
+  <path d="M 210 166 L 253 166" fill="none" stroke="#5b6b82" stroke-width="2.2" marker-end="url(#a3)"/>
+  <path d="M 455 166 L 498 166" fill="none" stroke="#5b6b82" stroke-width="2.2" marker-end="url(#a3)"/>
+  <path d="M 700 166 L 743 166" fill="none" stroke="#5b6b82" stroke-width="2.2" marker-end="url(#a3)"/>
+
+  <!-- reject drops -->
+  <path d="M 355 212 L 355 268" fill="none" stroke="#d05f7f" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a3r)"/>
+  <path d="M 600 212 L 600 268" fill="none" stroke="#d05f7f" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a3r)"/>
+  <g filter="url(#soft3)">
+    <rect x="300" y="272" width="360" height="40" rx="10" fill="#2a1420" stroke="#d05f7f" stroke-width="1.2"/>
+  </g>
+  <text x="480" y="297" text-anchor="middle" fill="#e88aa4" font-size="12">rejeté → aucun skill (« Je m'appelle Michael » s'arrête ici)</text>
+
+  <!-- Guardrails -->
+  <g filter="url(#soft3)">
+    <rect x="745" y="250" width="215" height="86" rx="13" fill="#2a1420" stroke="#d05f7f" stroke-width="1.4"/>
+  </g>
+  <text x="852" y="276" text-anchor="middle" fill="#e88aa4" font-size="13.5" font-weight="700">Garde-fous sécurité</text>
+  <text x="852" y="296" text-anchor="middle" fill="#d69fae" font-size="11">anti-injection (FR/EN, rôle,</text>
+  <text x="852" y="312" text-anchor="middle" fill="#d69fae" font-size="11">shell) · neutralisation</text>
+  <text x="852" y="329" text-anchor="middle" fill="#b57f8f" font-size="10">rejet + quarantaine au load</text>
+  <path d="M 852 214 L 852 248" fill="none" stroke="#d05f7f" stroke-width="1.8" marker-end="url(#a3r)"/>
+
+  <!-- Persistence -->
+  <g filter="url(#soft3)">
+    <rect x="745" y="372" width="215" height="66" rx="13" fill="#0d1f38" stroke="#3f7fd0" stroke-width="1.5"/>
+  </g>
+  <text x="852" y="399" text-anchor="middle" fill="#77a8ec" font-size="14" font-weight="700">Persistance</text>
+  <text x="852" y="419" text-anchor="middle" fill="#a9c2e6" font-size="11">skills.json (source de vérité)</text>
+  <path d="M 852 336 L 852 370" fill="none" stroke="#5b6b82" stroke-width="2" marker-end="url(#a3)"/>
+
+  <!-- Reinjection loop back to a future exchange -->
+  <g filter="url(#soft3)">
+    <rect x="255" y="386" width="330" height="86" rx="13" fill="#141b2b" stroke="#2f3d5c" stroke-width="1.5"/>
+  </g>
+  <text x="420" y="414" text-anchor="middle" fill="#c8d3e4" font-size="14.5" font-weight="700">Réinjection sur situation similaire</text>
+  <text x="420" y="436" text-anchor="middle" fill="#8895ac" font-size="11.5">match par embedding → le skill guide la réponse</text>
+  <text x="420" y="456" text-anchor="middle" fill="#6f7f97" font-size="11">fiable après ≥ 2 succès (sinon en probation)</text>
+
+  <path d="M 745 405 C 660 430 640 435 587 432" fill="none" stroke="#3f7fd0" stroke-width="2" marker-end="url(#a3)"/>
+  <path d="M 255 430 C 150 430 90 360 125 208" fill="none" stroke="#4b7fc0" stroke-width="2" stroke-dasharray="2 0" marker-end="url(#a3)" opacity="0.8"/>
+  <text x="70" y="330" fill="#6f8fc0" font-size="11" font-style="italic" transform="rotate(-90 70 330)">boucle d'apprentissage</text>
+
+  <!-- footer -->
+  <text x="500" y="516" text-anchor="middle" fill="#5a6172" font-size="11.5">La forme (types, longueur) est validée avant le fond (patterns interdits) — deux couches distinctes.</text>
+  <text x="500" y="536" text-anchor="middle" fill="#4a5162" font-size="11">Vérifié bout-en-bout sur GPU : skill_e9d951ad53af — 5 succès, confiance 0.87, persistant.</text>
+</svg>
