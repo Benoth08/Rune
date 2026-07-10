@@ -1035,6 +1035,11 @@ async def agent_status(request: Request) -> dict:
         picked = max(active, key=lambda kv: getattr(kv[1], "started_at", 0.0))
     elif runs:
         picked = max(runs.items(), key=lambda kv: getattr(kv[1], "started_at", 0.0))
+    else:
+        # Registre vide : le run a été purgé en fin de mission. On se
+        # rabat sur la dernière mission terminée pour ne pas vider le
+        # dashboard (le fil d'actions + le résultat restent affichés).
+        picked = getattr(ao, "_last_run", None)
 
     if picked is None:
         return {"running": False, "current_mission": {}, "recent_events": [],

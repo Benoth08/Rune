@@ -644,6 +644,10 @@ class AgentOrchestrator:
         self.react_enabled = react_enabled
         self._sandbox_factory = sandbox_factory
         self._runs: dict[str, _Run] = {}
+        # V0.1.1 — dernière mission terminée, conservée pour l'affichage
+        # dashboard APRÈS la purge de _runs (sinon le dashboard se vide
+        # dès la fin d'une mission). Une seule référence : pas de fuite.
+        self._last_run: tuple[str, _Run] | None = None
         self._trigger_emb_cache: dict[str, object] = {}  # trigger text → emb
         self._skill_lib: SkillLibrary | None = None       # lazy
 
@@ -2141,7 +2145,13 @@ class AgentOrchestrator:
                        "serve_and_probe", "delete_file", "run_python"):
                 ops.pop(_k, None)
         elif mode == "analyze":
-            for _k in ("run_tests", "serve_and_probe"):
+            # V0.1.1 — on NE retire plus run_tests : un calcul peut
+            # légitimement vouloir se vérifier par un test, et le prompt
+            # (exemples codés en dur) mentionne run_tests → le retirer
+            # faisait appeler un outil « indisponible » et tâtonner
+            # l'agent. On ne retire que serve_and_probe (inutile hors
+            # service web).
+            for _k in ("serve_and_probe",):
                 ops.pop(_k, None)
 
         # Morceau 1 — outils mémoire PULL (lecture seule). Ajoutés APRÈS le
@@ -3913,4 +3923,12 @@ class AgentOrchestrator:
             log.exception("Agent run failed")
             yield {"type": "run_error", "run_id": run_id, "error": str(exc)}
         finally:
+            # Conserve la dernière mission pour l'affichage dashboard
+            # AVANT de la retirer du registre actif (évite que le
+            # dashboard se vide dès la fin). marque done au cas où le
+            # dernier event n'aurait pas été capturé.
+            _r = self._runs.get(run_id)
+            if _r is not None:
+                _r.done = True
+                self._last_run = (run_id, _r)
             self._runs.pop(run_id, None)
