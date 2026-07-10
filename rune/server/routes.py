@@ -1011,6 +1011,70 @@ async def memory_status(request: Request) -> dict:
     return app.hippocampe.memory_status()
 
 
+@router.get("/api/agent/status")
+async def agent_status(request: Request) -> dict:
+    """État live de la mission agentique en cours, pour le dashboard.
+
+    Lit le registre ``_runs`` de l'orchestrateur EXISTANT (sans le
+    construire — pas de 503 si aucun modèle chargé) : mission courante,
+    fil des dernières actions de l'agent (buffer d'events), et compteurs
+    du blackboard. Renvoie ``running: false`` si aucune mission.
+    """
+    app = _lythea(request)
+    ao = getattr(app, "agent_orchestrator", None)
+    if ao is None:
+        return {"running": False, "current_mission": {}, "recent_events": [],
+                "blackboard": {}}
+
+    runs = getattr(ao, "_runs", {}) or {}
+    # Mission « courante » = le run le plus récent non terminé, sinon le
+    # dernier tout court (pour afficher le résultat juste après la fin).
+    active = [(rid, r) for rid, r in runs.items() if not getattr(r, "done", False)]
+    picked = None
+    if active:
+        picked = max(active, key=lambda kv: getattr(kv[1], "started_at", 0.0))
+    elif runs:
+        picked = max(runs.items(), key=lambda kv: getattr(kv[1], "started_at", 0.0))
+
+    if picked is None:
+        return {"running": False, "current_mission": {}, "recent_events": [],
+                "blackboard": {}}
+
+    run_id, run = picked
+    import time as _t
+    mission = {
+        "run_id": run_id,
+        "task": getattr(run, "task", ""),
+        "name": getattr(run, "name", ""),
+        "elapsed_sec": round(_t.time() - getattr(run, "started_at", _t.time()), 1),
+        "done": bool(getattr(run, "done", False)),
+    }
+    recent_events = list(getattr(run, "events", []))
+
+    # Blackboard : lu depuis le disque de la mission si présent.
+    blackboard: dict = {}
+    try:
+        slug = getattr(run, "slug", "") or ""
+        if slug:
+            from rune.agentic.blackboard import MissionBlackboard
+            ws = _workspace_manager(request)
+            root = getattr(ws, "root", None)
+            if root is not None:
+                bb_path = root / "missions" / slug / "blackboard.json"
+                if bb_path.exists():
+                    bb = MissionBlackboard.load(bb_path)
+                    blackboard = bb.to_dict()
+    except Exception:  # noqa: BLE001 — le status ne casse jamais
+        blackboard = {}
+
+    return {
+        "running": not mission["done"],
+        "current_mission": mission,
+        "recent_events": recent_events,
+        "blackboard": blackboard,
+    }
+
+
 @router.get("/api/cache/stats")
 async def cache_stats(request: Request) -> dict:
     """Expose embedding cache stats — useful for tuning cache sizes.

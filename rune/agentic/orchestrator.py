@@ -28,6 +28,7 @@ import asyncio
 import ipaddress
 import json
 import logging
+from collections import deque
 import threading
 import os
 import re
@@ -568,6 +569,55 @@ class _Run:
     # token → interrompt la génération EN COURS (stop réactif, pas seulement
     # entre les étapes).
     cancel: threading.Event = field(default_factory=threading.Event)
+    # V0.1.1 — buffer d'événements récents pour le monitoring live
+    # (dashboard). Alimenté au point unique où run() yield ses events.
+    # deque bornée : ne grossit jamais, garde les N derniers pas de l'agent.
+    events: deque = field(default_factory=lambda: deque(maxlen=40))
+    started_at: float = field(default_factory=time.time)
+    name: str = ""
+    slug: str = ""
+    done: bool = False
+
+
+def _record_event(run: "_Run", ev: dict) -> None:
+    """Résume un event de l'agent et l'ajoute au buffer du run.
+
+    Défensif : ne lève JAMAIS (le monitoring ne doit pas casser une
+    mission). On extrait juste de quoi afficher une ligne lisible dans
+    le dashboard — type, outil, ok/ko, court résumé — sans stocker les
+    gros payloads (contenus de fichiers, etc.).
+    """
+    try:
+        etype = ev.get("type", "?")
+        entry: dict = {"t": round(time.time() - run.started_at, 1), "type": etype}
+        if etype == "tool_call":
+            entry["tool"] = ev.get("name", "?")
+            args = ev.get("arguments", {}) or {}
+            # Résumé compact de l'argument principal (path ou command).
+            hint = args.get("path") or args.get("command") or args.get("test_file") or ""
+            if hint:
+                entry["hint"] = str(hint)[:60]
+        elif etype == "tool_result":
+            entry["tool"] = ev.get("name", "?")
+            entry["ok"] = bool(ev.get("ok", False))
+            prev = ev.get("preview", "")
+            if prev:
+                entry["hint"] = str(prev)[:80]
+        elif etype in ("agent_warning", "critique", "deliberation"):
+            entry["hint"] = str(ev.get("message") or ev.get("text") or "")[:80]
+        elif etype == "plan":
+            steps = ev.get("steps", [])
+            entry["hint"] = f"{len(steps)} étapes"
+        elif etype == "synthesis":
+            entry["hint"] = "synthèse produite"
+        elif etype in ("run_done", "run_stopped"):
+            run.done = True
+        elif etype == "run_start":
+            run.name = ev.get("name", "") or run.name
+            run.slug = ev.get("slug", "") or run.slug
+        run.events.append(entry)
+    except Exception:  # noqa: BLE001 — le monitoring ne casse jamais un run
+        pass
 
 
 class AgentOrchestrator:
@@ -3425,6 +3475,7 @@ class AgentOrchestrator:
             if use_react:
                 async for ev in self._react(task, run_id, run, core,
                                             attachments=attachments):
+                    _record_event(run, ev)
                     yield ev
                 return
             # Mission identity: a short name + a dedicated folder, so files

@@ -84,15 +84,16 @@ def render_mission(status: dict[str, Any]) -> Panel:
         content = Text("(aucune mission en cours)", style="dim italic")
     else:
         task = mission.get("task", "?")
-        phase = mission.get("phase", "?")
-        model = mission.get("model", "?")
+        name = mission.get("name", "") or "—"
         elapsed = mission.get("elapsed_sec", 0)
-        tokens = mission.get("tokens", 0)
+        done = mission.get("done", False)
+        state = Text("terminée", style="green") if done else Text("en cours", style="yellow")
 
         lines = [
-            Text(f"Task: {task}", style="white"),
-            Text(f"Phase: {phase} → {model}", style="yellow"),
-            Text(f"Elapsed: {elapsed:.1f}s | Tokens: {tokens}", style="dim"),
+            Text(f"Mission : {name}", style="bold cyan"),
+            Text(f"Tâche : {task}", style="white"),
+            Text("Statut : ", style="dim") + state
+            + Text(f"   |   {elapsed:.1f}s", style="dim"),
         ]
         content = Group(*lines)
 
@@ -240,30 +241,49 @@ def render_skills(status: dict[str, Any]) -> Panel:
 
 
 def render_logs(status: dict[str, Any]) -> Panel:
-    """Panneau logs (derniers 5)."""
-    logs = status.get("logs", [])
-    if not logs:
-        content = Text("(aucun log)", style="dim italic")
+    """Panneau « fil des actions de l'agent » (live).
+
+    Affiche les derniers événements de la mission en cours (write_file,
+    run_command, warnings, synthèse…) avec une icône par type et un
+    court résumé. C'est la fenêtre lisible sur ce que fait l'agent, en
+    remplacement du flux SSE brut.
+    """
+    events = status.get("recent_events", [])
+    if not events:
+        content = Text("(aucune action — lance une mission via /api/agent/run)",
+                       style="dim italic")
     else:
+        _icon = {
+            "run_start": ("▶", "cyan"),
+            "plan": ("≣", "cyan"),
+            "tool_call": ("→", "white"),
+            "tool_result": ("✓", "green"),      # ok remplacé plus bas si ✗
+            "agent_warning": ("⚠", "yellow"),
+            "critique": ("✎", "yellow"),
+            "deliberation": ("…", "dim"),
+            "synthesis": ("★", "magenta"),
+            "run_done": ("■", "green"),
+            "run_stopped": ("■", "red"),
+        }
         lines = []
-        for log_entry in logs[:5]:
-            ts = log_entry.get("ts", "?")
-            level = log_entry.get("level", "?")
-            msg = log_entry.get("msg", "?")
-            level_style = {
-                "ERROR": "red",
-                "WARNING": "yellow",
-                "INFO": "white",
-                "DEBUG": "dim",
-            }.get(level, "white")
-            lines.append(
-                Text(f"{ts} ", style="dim")
-                + Text(f"[{level}] ", style=level_style)
-                + Text(msg[:80])
-            )
+        for e in list(events)[-12:]:      # les 12 dernières actions
+            etype = e.get("type", "?")
+            icon, style = _icon.get(etype, ("·", "white"))
+            # tool_result KO → croix rouge
+            if etype == "tool_result" and not e.get("ok", False):
+                icon, style = "✗", "red"
+            t = e.get("t", 0)
+            tool = e.get("tool", "")
+            hint = e.get("hint", "")
+            label = tool or etype
+            line = Text(f"{t:>5.1f}s ", style="dim") + Text(f"{icon} ", style=style)
+            line += Text(f"{label}", style=style)
+            if hint:
+                line += Text(f"  {hint}", style="dim")
+            lines.append(line)
         content = Group(*lines)
 
-    return Panel(content, title="Logs", border_style="blue")
+    return Panel(content, title="Actions de l'agent (live)", border_style="blue")
 
 
 # ── Layout assemblage ────────────────────────────────────────────────
@@ -394,6 +414,19 @@ def fetch_status(
                         "skills_count": 0,
                         "failures_count": 0,
                     }
+            except Exception:
+                pass
+
+            # Statut agentique live (mission courante + fil des actions
+            # + blackboard). Endpoint dédié qui lit le registre des runs
+            # de l'orchestrateur sans le construire (pas de 503).
+            try:
+                r = client.get(f"{api_url}/api/agent/status")
+                if r.status_code == 200:
+                    ag = r.json()
+                    status["current_mission"] = ag.get("current_mission", {})
+                    status["recent_events"] = ag.get("recent_events", [])
+                    status["blackboard"] = ag.get("blackboard", {})
             except Exception:
                 pass
 
