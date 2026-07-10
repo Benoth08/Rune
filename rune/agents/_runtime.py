@@ -362,15 +362,16 @@ class _HFModelWrapperAdapter:
 
         start = _time.time()
         try:
-            # HFModelWrapper.generate attend (messages, **kwargs)
-            # Le contrat exact varie selon Lythea — on tente les kwargs courants
+            # HFModelWrapper.generate attend un PROMPT (str), pas une liste
+            # de messages : il tokenize directement l'entrée. On aplatit
+            # donc les messages [{role, content}, …] en une string via le
+            # chat template du tokenizer (ajoute le prompt d'assistant).
+            prompt = self._messages_to_prompt(messages)
             kwargs: dict[str, Any] = {
                 "max_new_tokens": getattr(config, "max_new_tokens", 512),
                 "temperature": getattr(config, "temperature", 0.4),
-                "do_sample": True,
             }
-            # Appel — HFModelWrapper peut exiger un stream=True/False
-            text = self.wrapper.generate(messages, **kwargs)
+            text = self.wrapper.generate(prompt, **kwargs)
             if isinstance(text, dict):
                 text = text.get("text", str(text))
             elif not isinstance(text, str):
@@ -390,3 +391,33 @@ class _HFModelWrapperAdapter:
                 elapsed_sec=_time.time() - start,
                 meta={"error": str(exc)},
             )
+
+    def _messages_to_prompt(self, messages: list[dict[str, str]]) -> str:
+        """Aplatit une liste de messages en un prompt string.
+
+        Utilise le chat template du tokenizer du wrapper (format natif du
+        modèle, ajoute le tour d'assistant). Repli robuste sur une simple
+        concaténation ``role: content`` si le template n'est pas
+        disponible (tokenizer sans chat_template, ou erreur).
+        """
+        if isinstance(messages, str):
+            return messages
+        tok = getattr(self.wrapper, "tokenizer", None)
+        if tok is not None and hasattr(tok, "apply_chat_template"):
+            try:
+                return tok.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=True,
+                )
+            except Exception as exc:
+                log.warning(
+                    "apply_chat_template failed (%s) — repli concaténation",
+                    exc,
+                )
+        # Repli : concaténation lisible + amorce d'assistant.
+        parts = []
+        for m in messages:
+            role = m.get("role", "user")
+            content = m.get("content", "")
+            parts.append(f"{role}: {content}")
+        parts.append("assistant:")
+        return "\n".join(parts)
