@@ -2306,6 +2306,52 @@ class AgentOrchestrator:
             _snip = self._recall_snippet(task)
             if _snip:
                 history += _snip
+
+        # ── Chantier 3 — Injection auto du contexte mémoire (Niveau 1) ──
+        # Au démarrage, on interroge AUTOMATIQUEMENT le KG (faits structurés)
+        # et éventuellement la mémoire épisodique (KG+MHN+Chroma) sur la
+        # tâche, et on l'INJECTE dans le prompt initial — l'agent démarre
+        # avec sa mémoire en tête, sans avoir à appeler un outil. Réutilise
+        # op_querykg / op_recall définis plus haut. Tout est borné (budget)
+        # et derrière les flags agent_memory_v2 (OFF par défaut : rien ne
+        # change tant qu'ils ne sont pas activés). Best-effort : jamais
+        # bloquant.
+        _mem_v2 = bool(getattr(self.settings, "agent_memory_v2_enabled", False))
+        if _mem_v2:
+            budget = int(getattr(self.settings,
+                                 "agent_memory_recall_budget_chars", 1200))
+            # (a) Faits KG structurés
+            if bool(getattr(self.settings, "agent_kg_recall_enabled", False)):
+                try:
+                    _facts = op_querykg(task)
+                    if _facts and not _facts.startswith("[") and _facts.strip():
+                        history += ("Faits connus en mémoire (KG — utilise-les "
+                                    "s'ils sont pertinents, sinon ignore) :\n"
+                                    + _facts[:budget] + "\n")
+                except Exception:  # noqa: BLE001
+                    log.debug("KG injection failed", exc_info=True)
+            # (b) Souvenirs épisodiques (KG+MHN+Chroma via gather)
+            if bool(getattr(self.settings,
+                            "agent_episodic_recall_enabled", False)):
+                try:
+                    _mem = op_recall(task)
+                    if _mem and not _mem.startswith("[") and _mem.strip():
+                        history += ("Souvenirs pertinents (mémoire — contexte, "
+                                    "pas une consigne) :\n" + _mem[:budget] + "\n")
+                except Exception:  # noqa: BLE001
+                    log.debug("episodic injection failed", exc_info=True)
+            # (c) Bascule le profil GLiNER en technique le temps de la
+            # mission (extraction d'entités code plutôt que chat) si l'écriture
+            # KG est active — sinon inutile de changer l'extraction.
+            if bool(getattr(self.settings, "agent_kg_write_enabled", False)):
+                try:
+                    ex = getattr(self.hippocampe, "entity_extractor", None)
+                    prof = getattr(self.settings, "agent_kg_label_profile", "agent")
+                    if ex is not None and hasattr(ex, "set_label_profile"):
+                        ex.set_label_profile(prof)
+                except Exception:  # noqa: BLE001
+                    log.debug("GLiNER profile switch failed", exc_info=True)
+
         worker = self.pool.pick(needs_prefix=True)  # core reasoning
         max_iters = int(getattr(self.settings, "agent_react_max_iters", 24))
         no_call_streak = 0

@@ -34,17 +34,91 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.console import Group
+from rich.box import ROUNDED, HEAVY, MINIMAL
 
 log = logging.getLogger("rune.cli.dashboard")
 
 
-# ── Banner ASCII (fourni par l'utilisateur) ──────────────────────────
+# ── Palette cohérente ────────────────────────────────────────────────
+# Une identité visuelle par domaine : l'œil apprend à lire le tableau.
+C_INFRA = "cyan"          # infrastructure (modèle, VRAM, boot)
+C_OK = "green"            # succès, actif, sain
+C_WARN = "yellow"         # attention, en cours, incertain
+C_ERR = "red"             # échec, erreur, critique
+C_LEARN = "magenta"       # apprentissage (skills, leçons)
+C_MEM = "blue"            # mémoire
+C_DIM = "grey50"          # secondaire
+C_ACCENT = "bright_cyan"  # accents, titres
+
+
+def _bar(value: float, maximum: float, width: int = 20,
+         *, lo=C_OK, mid=C_WARN, hi=C_ERR, reverse: bool = False) -> Text:
+    """Barre de progression colorée (jauge). La couleur suit le taux de
+    remplissage : vert → jaune → rouge (ou l'inverse si reverse).
+
+    Utilisé pour la VRAM, les scores, la progression d'une mission.
+    """
+    if maximum <= 0:
+        maximum = 1.0
+    frac = max(0.0, min(1.0, value / maximum))
+    filled = int(round(frac * width))
+    # Couleur selon le taux (VRAM pleine = rouge ; score haut = vert).
+    ratio = (1.0 - frac) if reverse else frac
+    if ratio < 0.5:
+        color = lo
+    elif ratio < 0.8:
+        color = mid
+    else:
+        color = hi
+    bar = Text()
+    bar.append("█" * filled, style=color)
+    bar.append("░" * (width - filled), style=C_DIM)
+    return bar
+
+
+def _gauge_line(label: str, value: float, maximum: float, unit: str = "",
+                width: int = 18, **kw) -> Text:
+    """Une ligne « label [████░░░░] valeur/max unit »."""
+    line = Text()
+    line.append(f"{label:<10}", style=C_DIM)
+    line.append_text(_bar(value, maximum, width, **kw))
+    txt = f" {value:.1f}"
+    if maximum and maximum != value:
+        txt += f"/{maximum:.0f}"
+    if unit:
+        txt += f" {unit}"
+    line.append(txt, style="white")
+    return line
+
+
+def _pill(text: str, style: str) -> Text:
+    """Une pastille colorée ●."""
+    t = Text()
+    t.append("● ", style=style)
+    t.append(text, style=style)
+    return t
+
+
+def _sparkbar(counts: list[int], width_each: int = 1) -> Text:
+    """Mini histogramme vertical à partir de compteurs (sparkline)."""
+    if not counts:
+        return Text("", style=C_DIM)
+    blocks = "▁▂▃▄▅▆▇█"
+    mx = max(counts) or 1
+    t = Text()
+    for c in counts:
+        idx = int(round((c / mx) * (len(blocks) - 1)))
+        t.append(blocks[idx] * width_each, style=C_ACCENT)
+    return t
+
+
+# ── Banner ASCII ─────────────────────────────────────────────────────
 BANNER = r"""
-  ____    _   _   _   _   _____       _       ____   _____   _   _   _____
- |  _ \  | | | | | \ | | | ____|     / \     / ___| | ____| | \ | | |_   _|
- | |_) | | | | | |  \| | |  _|      / _ \   |  _  |  _|   |  \| |   | |
- |  _ <  | |_| | | |\  | | |___    / ___ \  | |_| | | |___  | |\  |   | |
- |_| \_\  \___/  |_| \_| |_____|  /_/   \_\  \____| |_____| |_| \_|  |_|
+  ____    _   _   _   _   _____
+ |  _ \  | | | | | \ | | | ____|
+ | |_) | | | | | |  \| | |  _|
+ |  _ <  | |_| | | |\  | | |___
+ |_| \_\  \___/  |_| \_| |_____|
 """
 
 
@@ -56,188 +130,369 @@ def render_banner() -> Text:
 # ── Panels ───────────────────────────────────────────────────────────
 
 
-def render_header(status: dict[str, Any]) -> Panel:
-    """Panneau d'en-tête : banner + ligne de statut global."""
-    trinity = status.get("trinity", {})
-    trinity_line = ""
-    if trinity.get("enabled"):
-        worker = trinity.get("roles", {}).get("worker", {}).get("model_id", "?")
-        trinity_line = f"Trinity: ON (Worker: {worker})"
-    else:
-        trinity_line = "Trinity: OFF (single-model)"
+def render_header(status: dict[str, Any], started: float = 0.0) -> Panel:
+    """En-tête : banner + bandeau de contrôle (modèle, VRAM, Trinity, uptime)."""
+    # Colonne gauche : banner + tagline
+    left = Table.grid()
+    left.add_column()
+    left.add_row(Text(BANNER, style=f"bold {C_INFRA}"))
+    left.add_row(Text("  agent cognitif local · v0.1.1", style=C_DIM))
 
+    # Colonne droite : statut système en lignes compactes
+    right = Table.grid(padding=(0, 1))
+    right.add_column(justify="left")
+
+    # Modèle chargé — pastille
+    model_id = status.get("model_id")
+    loaded = status.get("model_loaded", False)
+    if loaded and model_id:
+        short = model_id.split("/")[-1]
+        right.add_row(_pill(f"Modèle : {short}", C_OK))
+    else:
+        right.add_row(_pill("Aucun modèle chargé", C_ERR))
+
+    # VRAM — jauge (rouge si pleine)
+    free = status.get("vram_free_gb", 0) or 0
+    total = status.get("vram_total_gb", 0) or 0
+    if total > 0:
+        used = max(0.0, total - free)
+        right.add_row(_gauge_line("VRAM", used, total, "Go", width=16, reverse=True))
+
+    # Trinity — état + rôles
+    trinity = status.get("trinity", {})
+    if trinity.get("enabled"):
+        right.add_row(_pill("Trinity : ON (Thinker+Worker+Critic)", C_LEARN))
+    else:
+        right.add_row(_pill("Trinity : OFF (single-model)", C_DIM))
+
+    # Boot — pastille selon l'état des composants
+    comps = status.get("boot_components", {})
+    if comps:
+        n_ok = sum(1 for v in comps.values() if v == "ok")
+        n_tot = len(comps)
+        bstyle = C_OK if n_ok == n_tot else (C_WARN if n_ok else C_ERR)
+        right.add_row(_pill(f"Boot : {n_ok}/{n_tot} composants", bstyle))
+
+    # Uptime + horloge
     now = time.strftime("%H:%M:%S")
-    title = f"Rune v0.1.0 — {trinity_line} — {now}"
+    up = ""
+    if started:
+        secs = int(time.time() - started)
+        up = f"  ·  uptime {secs//60}m{secs%60:02d}s"
+    right.add_row(Text(f"⏱  {now}{up}", style=C_DIM))
+
+    # Assemblage deux colonnes
+    grid = Table.grid(expand=True)
+    grid.add_column(ratio=2)
+    grid.add_column(ratio=3)
+    grid.add_row(left, right)
 
     return Panel(
-        Align.left(Text(BANNER, style="bold cyan")),
-        title=title,
-        border_style="cyan",
+        grid,
+        title=Text("RUNE", style=f"bold {C_ACCENT}"),
+        subtitle=Text("cognitive agent · live", style=C_DIM),
+        border_style=C_INFRA,
+        box=HEAVY,
         padding=(0, 1),
     )
 
 
 def render_mission(status: dict[str, Any]) -> Panel:
-    """Panneau mission courante."""
+    """Mission courante : nom, statut, durée, progression, compteurs."""
     mission = status.get("current_mission", {})
+    events = status.get("recent_events", [])
     if not mission:
-        content = Text("(aucune mission en cours)", style="dim italic")
+        return Panel(
+            Align.center(Text("En attente d'une mission…", style="dim italic"),
+                         vertical="middle"),
+            title="Mission", border_style=C_DIM, box=ROUNDED,
+        )
+
+    name = mission.get("name", "") or "—"
+    task = mission.get("task", "?")
+    elapsed = mission.get("elapsed_sec", 0)
+    done = mission.get("done", False)
+
+    # Compteurs d'actions depuis le fil d'events
+    n_tools = sum(1 for e in events if e.get("type") == "tool_call")
+    n_ok = sum(1 for e in events if e.get("type") == "tool_result" and e.get("ok"))
+    n_ko = sum(1 for e in events if e.get("type") == "tool_result" and not e.get("ok"))
+    n_lesson = sum(1 for e in events if e.get("type") == "lesson_learned")
+
+    grid = Table.grid(padding=(0, 1), expand=True)
+    grid.add_column()
+
+    # Ligne titre : pastille statut + nom
+    head = Text()
+    if done:
+        head.append("● ", style=C_OK)
+        head.append(name, style=f"bold {C_ACCENT}")
+        head.append("   terminée", style=C_OK)
     else:
-        task = mission.get("task", "?")
-        name = mission.get("name", "") or "—"
-        elapsed = mission.get("elapsed_sec", 0)
-        done = mission.get("done", False)
-        state = Text("terminée", style="green") if done else Text("en cours", style="yellow")
+        head.append("● ", style=C_WARN)
+        head.append(name, style=f"bold {C_ACCENT}")
+        head.append("   en cours", style=C_WARN)
+    head.append(f"   ·   {elapsed:.1f}s", style=C_DIM)
+    grid.add_row(head)
 
-        lines = [
-            Text(f"Mission : {name}", style="bold cyan"),
-            Text(f"Tâche : {task}", style="white"),
-            Text("Statut : ", style="dim") + state
-            + Text(f"   |   {elapsed:.1f}s", style="dim"),
-        ]
-        content = Group(*lines)
+    # Tâche (tronquée)
+    grid.add_row(Text(task[:110] + ("…" if len(task) > 110 else ""), style="white"))
 
-    return Panel(content, title="Mission courante", border_style="blue")
+    # Ligne compteurs : outils / réussis / échoués / leçons
+    counters = Text()
+    counters.append(f"⚙ {n_tools} actions", style=C_INFRA)
+    counters.append("    ")
+    counters.append(f"✓ {n_ok}", style=C_OK)
+    counters.append("   ")
+    counters.append(f"✗ {n_ko}", style=C_ERR if n_ko else C_DIM)
+    if n_lesson:
+        counters.append("    ")
+        counters.append(f"🎓 {n_lesson} leçon(s)", style=C_LEARN)
+    grid.add_row(counters)
+
+    border = C_OK if done else C_WARN
+    return Panel(grid, title="Mission courante", border_style=border, box=ROUNDED)
 
 
 def render_subagents(status: dict[str, Any]) -> Panel:
-    """Panneau sous-agents."""
+    """Sous-agents et leur statut, avec pastilles colorées."""
     subagents = status.get("subagents", [])
     if not subagents:
-        content = Text("(aucun sous-agent)", style="dim italic")
-    else:
-        table = Table(show_header=True, header_style="bold", expand=True, box=None)
-        table.add_column("#", style="cyan", width=3)
-        table.add_column("Section", style="white")
-        table.add_column("Statut", justify="center", width=6)
-        table.add_column("Modèle", style="dim")
-
-        for i, sa in enumerate(subagents, 1):
-            sa_status = sa.get("status", "?")
-            style = {
-                "RUN": "bold yellow",
-                "DONE": "green",
-                "ERROR": "red",
-                "WAIT": "dim",
-            }.get(sa_status, "white")
-            table.add_row(
-                str(i),
-                sa.get("section", "?")[:20],
-                Text(sa_status, style=style),
-                sa.get("model", "?")[:30],
-            )
-        content = table
-
-    return Panel(content, title="Subagents", border_style="magenta")
+        return Panel(
+            Align.center(Text("Aucun sous-agent actif", style="dim italic"),
+                         vertical="middle"),
+            title="Sous-agents", border_style=C_DIM, box=ROUNDED,
+        )
+    table = Table(show_header=True, header_style=f"bold {C_DIM}", expand=True, box=None)
+    table.add_column("#", style=C_INFRA, width=3)
+    table.add_column("Section", style="white")
+    table.add_column("Statut", justify="left", width=8)
+    table.add_column("Modèle", style=C_DIM)
+    _pillmap = {
+        "RUN": ("en cours", C_WARN), "DONE": ("fini", C_OK),
+        "ERROR": ("erreur", C_ERR), "WAIT": ("attente", C_DIM),
+    }
+    for i, sa in enumerate(subagents, 1):
+        lbl, st = _pillmap.get(sa.get("status", "?"), ("?", "white"))
+        table.add_row(str(i), sa.get("section", "?")[:20],
+                      _pill(lbl, st), sa.get("model", "?")[:24])
+    return Panel(table, title="Sous-agents", border_style=C_LEARN, box=ROUNDED)
 
 
 def render_blackboard(status: dict[str, Any]) -> Panel:
-    """Panneau blackboard."""
+    """Blackboard : sections avec mini-barres wins/fails visuelles."""
     bb = status.get("blackboard", {})
     if not bb or not bb.get("sections"):
-        content = Text("(pas de blackboard)", style="dim italic")
-    else:
-        table = Table(show_header=True, header_style="bold", expand=True, box=None)
-        table.add_column("Section", style="cyan")
-        table.add_column("Wins", justify="right", style="green", width=5)
-        table.add_column("Fails", justify="right", style="red", width=5)
-        table.add_column("Notes", justify="right", style="yellow", width=5)
-        table.add_column("Statut", style="white", width=10)
+        return Panel(
+            Align.center(Text("Pas encore de tableau noir", style="dim italic"),
+                         vertical="middle"),
+            title="Blackboard", border_style=C_DIM, box=ROUNDED,
+        )
 
-        contract = bb.get("contract", "")
-        if contract:
-            table.add_row("_contract", "-", "-", "-", Text(contract[:40], style="dim italic"))
+    grid = Table.grid(padding=(0, 1), expand=True)
+    grid.add_column(style=C_INFRA, no_wrap=True)   # section
+    grid.add_column()                               # barres
+    grid.add_column(justify="right", style=C_DIM)   # statut
 
-        for name, sec in bb.get("sections", {}).items():
-            table.add_row(
-                name[:20],
-                str(len(sec.get("wins", []))),
-                str(len(sec.get("fails", []))),
-                str(len(sec.get("notes", []))),
-                sec.get("status", "?"),
-            )
-        content = table
+    contract = bb.get("contract", "")
+    if contract:
+        grid.add_row(Text("contrat", style=C_DIM),
+                     Text(contract[:44], style="dim italic"), "")
 
-    return Panel(content, title="Blackboard", border_style="green")
+    sections = bb.get("sections", {})
+    # Échelle commune pour comparer les sections entre elles
+    max_items = 1
+    for sec in sections.values():
+        max_items = max(max_items, len(sec.get("wins", [])) + len(sec.get("fails", [])))
+
+    for name, sec in sections.items():
+        w = len(sec.get("wins", []))
+        f = len(sec.get("fails", []))
+        n = len(sec.get("notes", []))
+        st = sec.get("status", "?")
+        # Barre : segment vert (wins) + segment rouge (fails)
+        bar = Text()
+        seg_w = int(round((w / max_items) * 14)) if max_items else 0
+        seg_f = int(round((f / max_items) * 14)) if max_items else 0
+        bar.append("█" * seg_w, style=C_OK)
+        bar.append("█" * seg_f, style=C_ERR)
+        bar.append("·" * max(0, 14 - seg_w - seg_f), style=C_DIM)
+        bar.append(f"  {w}✓ {f}✗", style=C_DIM)
+        if n:
+            bar.append(f" {n}📝", style=C_WARN)
+        ststyle = C_OK if "termin" in st or "done" in st else C_WARN
+        grid.add_row(name[:16], bar, Text(st[:10], style=ststyle))
+
+    return Panel(grid, title="Blackboard", border_style=C_OK, box=ROUNDED)
 
 
 def render_memory(status: dict[str, Any]) -> Panel:
-    """Panneau mémoire."""
+    """Mémoire : compteurs avec distinction actif (KG/Chroma) / dormant (SDM)."""
     mem = status.get("memory", {})
     if not mem:
-        content = Text("(mémoire indisponible)", style="dim italic")
-    else:
-        table = Table(show_header=False, expand=True, box=None)
-        table.add_column("Key", style="cyan", width=12)
-        table.add_column("Value", style="white")
-        table.add_row("SDM", str(mem.get("sdm_count", "?")))
-        table.add_row("MHN", str(mem.get("mhn_count", "?")))
-        table.add_row("KG", str(mem.get("kg_entities", "?")))
-        table.add_row("Chroma", str(mem.get("chroma_count", "?")))
-        table.add_row("Skills", str(mem.get("skills_count", "?")))
-        table.add_row("Failures", str(mem.get("failures_count", "?")))
-        content = table
+        return Panel(
+            Align.center(Text("Mémoire indisponible", style="dim italic"),
+                         vertical="middle"),
+            title="Mémoire", border_style=C_DIM, box=ROUNDED,
+        )
+    grid = Table.grid(padding=(0, 1), expand=True)
+    grid.add_column(style=C_MEM, no_wrap=True, width=9)
+    grid.add_column(justify="right", style="white", width=7)
+    grid.add_column(style=C_DIM)   # étiquette actif/dormant
 
-    return Panel(content, title="Mémoire", border_style="blue")
+    def _row(label, val, tag, tagstyle):
+        grid.add_row(label, str(val), Text(tag, style=tagstyle))
+
+    # Actifs (utilisés aujourd'hui)
+    _row("KG", mem.get("kg_entities", "?"), "actif", C_OK)
+    _row("Chroma", mem.get("chroma_count", "?"), "actif", C_OK)
+    _row("MHN", mem.get("mhn_count", "?"), "câblé", C_INFRA)
+    # Dormant
+    _row("SDM", mem.get("sdm_count", "?"), "dormant", C_DIM)
+    # Apprentissage
+    _row("Skills", mem.get("skills_count", "?"), "appris", C_LEARN)
+    _row("Échecs", mem.get("failures_count", "?"), "", C_DIM)
+
+    return Panel(grid, title="Mémoire", border_style=C_MEM, box=ROUNDED)
 
 
 def render_metacognition(status: dict[str, Any]) -> Panel:
-    """Panneau métacognition."""
+    """Métacognition : confidence + jauges doute/calibration."""
     meta = status.get("metacognition", {})
-    if not meta:
-        content = Text("(métacognition indisponible)", style="dim italic")
-    else:
-        confidence = meta.get("confidence_label", "?")
-        doubt = meta.get("doubt_index", 0)
-        brier = meta.get("calibration_score", 0)
-        recommend_web = meta.get("recommend_web", False)
-
-        # Couleur selon confidence
-        conf_style = {
-            "très_certaine": "bold green",
-            "certaine": "green",
-            "incertaine": "yellow",
-            "très_incertaine": "bold red",
-        }.get(confidence, "white")
-
-        table = Table(show_header=False, expand=True, box=None)
-        table.add_column("Key", style="cyan", width=14)
-        table.add_column("Value")
-        table.add_row("Confidence", Text(confidence, style=conf_style))
-        table.add_row("Doubt", f"{doubt:.3f}")
-        table.add_row("Brier score", f"{brier:.3f}")
-        table.add_row(
-            "Recommend web",
-            Text("yes" if recommend_web else "no",
-                 style="yellow" if recommend_web else "dim"),
+    if not meta or not meta.get("available", True):
+        return Panel(
+            Align.center(Text("En attente d'un échange…", style="dim italic"),
+                         vertical="middle"),
+            title="Métacognition", border_style=C_DIM, box=ROUNDED,
         )
-        content = table
+    confidence = meta.get("confidence_label", "?")
+    doubt = meta.get("doubt_index", 0) or 0
+    brier = meta.get("calibration_score", 0) or 0
+    recommend_web = meta.get("recommend_web", False)
 
-    return Panel(content, title="Métacognition", border_style="yellow")
+    conf_style = {
+        "très_certaine": f"bold {C_OK}", "certaine": C_OK,
+        "incertaine": C_WARN, "très_incertaine": f"bold {C_ERR}",
+    }.get(confidence, "white")
+
+    grid = Table.grid(padding=(0, 0), expand=True)
+    grid.add_column()
+    grid.add_row(_pill(f"Confiance : {confidence}", conf_style))
+    # Jauge de doute (haut = rouge)
+    grid.add_row(_gauge_line("Doute", doubt, 1.0, "", width=14, reverse=True))
+    # Jauge de calibration Brier (bas = bon → reverse pour vert quand bas)
+    grid.add_row(_gauge_line("Brier", brier, 1.0, "", width=14, reverse=True))
+    web = Text()
+    web.append("Web conseillé : ", style=C_DIM)
+    web.append("oui" if recommend_web else "non",
+               style=C_WARN if recommend_web else C_DIM)
+    grid.add_row(web)
+
+    return Panel(grid, title="Métacognition", border_style=C_WARN, box=ROUNDED)
+
+
+def render_cognitive(status: dict[str, Any]) -> Panel:
+    """Cycle cognitif : planification, predictive coding, inhibition, phases.
+
+    Lit /api/config/v4 (v4_status). Affiche l'état actif/dormant de chaque
+    phase + les données riches quand elles existent (goal actif, gating,
+    stats d'inhibition).
+    """
+    cog = status.get("cognitive", {})
+    if not cog:
+        return Panel(
+            Align.center(Text("État cognitif indisponible", style="dim italic"),
+                         vertical="middle"),
+            title="Cognitif", border_style=C_DIM, box=ROUNDED,
+        )
+
+    grid = Table.grid(padding=(0, 1), expand=True)
+    grid.add_column(no_wrap=True)
+
+    def _phase(name: str, block: dict, extra: Text | None = None):
+        on = bool(block.get("enabled"))
+        line = Text()
+        line.append("● ", style=C_OK if on else C_DIM)
+        line.append(f"{name} ", style="white" if on else C_DIM)
+        line.append("actif" if on else "dormant",
+                    style=C_OK if on else C_DIM)
+        grid.add_row(line)
+        if extra is not None and on:
+            grid.add_row(extra)
+
+    # Planification — avec goal actif si présent
+    planning = cog.get("planning", {})
+    goal = planning.get("active_goal")
+    extra = None
+    if goal:
+        cur = goal.get("current_step", 0)
+        n = goal.get("n_steps", 0)
+        desc = (goal.get("description", "") or "")[:34]
+        e = Text()
+        e.append("    ", style=C_DIM)
+        e.append_text(_bar(cur, max(n, 1), 10))
+        e.append(f" {cur}/{n}  {desc}", style=C_DIM)
+        extra = e
+    _phase("Planification", planning, extra)
+
+    # Predictive coding — dernière décision de gating
+    pc = cog.get("predictive_coding", {})
+    extra = None
+    last = pc.get("last_decision")
+    if last and isinstance(last, dict):
+        err = last.get("error") or last.get("prediction_error") or last.get("surprise")
+        if err is not None:
+            e = Text()
+            e.append("    erreur préd. ", style=C_DIM)
+            try:
+                e.append_text(_bar(float(err), 1.0, 10, reverse=True))
+                e.append(f" {float(err):.2f}", style=C_DIM)
+            except (TypeError, ValueError):
+                e.append(str(err)[:20], style=C_DIM)
+            extra = e
+    _phase("Predictive coding", pc, extra)
+
+    # Inhibition — stats
+    inh = cog.get("inhibition", {})
+    extra = None
+    stats = inh.get("stats")
+    if stats and isinstance(stats, dict):
+        blocked = stats.get("blocked", stats.get("n_blocked", 0))
+        reformed = stats.get("reformulated", stats.get("n_reformulated", 0))
+        e = Text()
+        e.append(f"    {blocked} bloquées · {reformed} reformulées", style=C_DIM)
+        extra = e
+    _phase("Inhibition", inh, extra)
+
+    # Délibération / Réflexion — on/off (pas de trace détaillée stockée)
+    _phase("Délibération", cog.get("deliberation", {"enabled": cog.get("metacognition", {}).get("enabled", False)}))
+    _phase("Métacognition", cog.get("metacognition", {}))
+
+    return Panel(grid, title="Cognitif · cycle", border_style=C_ACCENT, box=ROUNDED)
 
 
 def render_skills(status: dict[str, Any]) -> Panel:
-    """Panneau skills actifs (top 3)."""
+    """Skills appris (top 3) avec jauge de confiance."""
     skills = status.get("skills", [])
     if not skills:
-        content = Text("(aucun skill appris)", style="dim italic")
-    else:
-        table = Table(show_header=True, header_style="bold", expand=True, box=None)
-        table.add_column("ID", style="cyan", width=14)
-        table.add_column("Trigger", style="white")
-        table.add_column("Succès", justify="right", style="green", width=6)
-        table.add_column("Conf.", justify="right", width=6)
-
-        for skill in skills[:3]:
-            table.add_row(
-                skill.get("id", "?")[:12],
-                skill.get("trigger", "?")[:30],
-                str(skill.get("success_count", 0)),
-                f"{skill.get('confidence', 0):.2f}",
-            )
-        content = table
-
-    return Panel(content, title="Skills actifs", border_style="magenta")
+        return Panel(
+            Align.center(Text("Aucun skill appris", style="dim italic"),
+                         vertical="middle"),
+            title="Skills", border_style=C_DIM, box=ROUNDED,
+        )
+    grid = Table.grid(padding=(0, 1), expand=True)
+    grid.add_column(style="white")            # trigger
+    grid.add_column(justify="right", style=C_OK, width=4)  # succès
+    grid.add_column(width=10)                 # jauge conf
+    for s in skills[:4]:
+        trig = s.get("trigger", "?")
+        conf = s.get("confidence", 0) or 0
+        grid.add_row(
+            trig[:24] + ("…" if len(trig) > 24 else ""),
+            f"{s.get('success_count', 0)}✓",
+            _bar(conf, 1.0, 8),
+        )
+    return Panel(grid, title="Skills appris", border_style=C_LEARN, box=ROUNDED)
 
 
 def render_logs(status: dict[str, Any]) -> Panel:
@@ -250,97 +505,86 @@ def render_logs(status: dict[str, Any]) -> Panel:
     """
     events = status.get("recent_events", [])
     if not events:
-        content = Text("(aucune action — lance une mission via /api/agent/run)",
-                       style="dim italic")
-    else:
-        _icon = {
-            "run_start": ("▶", "cyan"),
-            "plan": ("≣", "cyan"),
-            "tool_call": ("→", "white"),
-            "tool_result": ("✓", "green"),      # ok remplacé plus bas si ✗
-            "agent_warning": ("⚠", "yellow"),
-            "critique": ("✎", "yellow"),
-            "deliberation": ("…", "dim"),
-            "synthesis": ("★", "magenta"),
-            "lesson_learned": ("🎓", "green"),
-            "run_done": ("■", "green"),
-            "run_stopped": ("■", "red"),
-        }
-        lines = []
-        for e in list(events)[-12:]:      # les 12 dernières actions
-            etype = e.get("type", "?")
-            icon, style = _icon.get(etype, ("·", "white"))
-            # tool_result KO → croix rouge
-            if etype == "tool_result" and not e.get("ok", False):
-                icon, style = "✗", "red"
-            t = e.get("t", 0)
-            tool = e.get("tool", "")
-            hint = e.get("hint", "")
-            label = tool or etype
-            # Libellés lisibles pour les events sans outil.
-            _labels = {
-                "lesson_learned": "leçon apprise",
-                "synthesis": "synthèse",
-                "run_done": "terminé",
-                "run_stopped": "arrêté",
-                "run_start": "démarrage",
-                "agent_warning": "alerte",
-                "critique": "critique",
-                "plan": "plan",
-            }
-            label = tool or _labels.get(etype, etype)
-            line = Text(f"{t:>5.1f}s ", style="dim") + Text(f"{icon} ", style=style)
-            line += Text(f"{label}", style=style)
-            if hint:
-                line += Text(f"  {hint}", style="dim")
-            lines.append(line)
-        content = Group(*lines)
-
-    return Panel(content, title="Actions de l'agent (live)", border_style="blue")
+        return Panel(
+            Align.center(
+                Text("En attente d'actions — lance une mission",
+                     style="dim italic"), vertical="middle"),
+            title="Actions de l'agent · live", border_style=C_DIM, box=ROUNDED,
+        )
+    _icon = {
+        "run_start": ("▶", C_INFRA), "plan": ("≣", C_INFRA),
+        "tool_call": ("→", "white"), "tool_result": ("✓", C_OK),
+        "agent_warning": ("⚠", C_WARN), "critique": ("✎", C_WARN),
+        "deliberation": ("…", C_DIM), "synthesis": ("★", C_LEARN),
+        "lesson_learned": ("🎓", C_LEARN), "run_done": ("■", C_OK),
+        "run_stopped": ("■", C_ERR),
+    }
+    _labels = {
+        "lesson_learned": "leçon apprise", "synthesis": "synthèse",
+        "run_done": "terminé", "run_stopped": "arrêté",
+        "run_start": "démarrage", "agent_warning": "alerte",
+        "critique": "critique", "plan": "plan",
+    }
+    lines = []
+    for e in list(events)[-13:]:
+        etype = e.get("type", "?")
+        icon, style = _icon.get(etype, ("·", "white"))
+        if etype == "tool_result" and not e.get("ok", False):
+            icon, style = "✗", C_ERR
+        t = e.get("t", 0)
+        tool = e.get("tool", "")
+        hint = e.get("hint", "")
+        label = tool or _labels.get(etype, etype)
+        line = Text(f"{t:>5.1f}s ", style=C_DIM)
+        line.append(f"{icon} ", style=style)
+        line.append(f"{label:<13}", style=style)
+        if hint:
+            line.append(f" {hint}", style=C_DIM)
+        lines.append(line)
+    return Panel(Group(*lines), title="Actions de l'agent · live",
+                 border_style=C_INFRA, box=ROUNDED)
 
 
 # ── Layout assemblage ────────────────────────────────────────────────
 
 
-def build_layout(status: dict[str, Any]) -> Layout:
+def build_layout(status: dict[str, Any], started: float = 0.0) -> Layout:
     """Assemble tous les panels dans un layout grid."""
     layout = Layout()
 
-    # Ligne 1 : banner (taille fixe)
+    # Bandeau + corps
     layout.split_column(
-        Layout(name="header", size=8),
+        Layout(name="header", size=9),
         Layout(name="body", ratio=1),
     )
 
-    # Body : 3 rangées
+    # Corps : mission (fin), puis contexte, puis le fil d'actions (large)
     layout["body"].split_column(
-        Layout(name="row1", size=8),  # mission
-        Layout(name="row2", ratio=1),  # subagents + blackboard
-        Layout(name="row3", ratio=1),  # memory + metacog + skills
-        Layout(name="row4", size=8),  # logs
+        Layout(name="row1", size=7),   # mission (compacte)
+        Layout(name="row2", size=9),   # subagents + blackboard
+        Layout(name="row3", size=8),   # memory + metacog + skills
+        Layout(name="row_cog", size=9),  # cognitif (cycle complet)
+        Layout(name="row4", ratio=1),  # actions — la vedette, prend le reste
     )
 
-    # Row 2 : subagents | blackboard
     layout["row2"].split_row(
         Layout(name="subagents", ratio=1),
-        Layout(name="blackboard", ratio=1),
+        Layout(name="blackboard", ratio=2),   # blackboard plus large
     )
-
-    # Row 3 : memory | metacog | skills
     layout["row3"].split_row(
         Layout(name="memory", ratio=1),
         Layout(name="metacog", ratio=1),
         Layout(name="skills", ratio=1),
     )
 
-    # Remplissage
-    layout["header"].update(render_header(status))
+    layout["header"].update(render_header(status, started))
     layout["row1"].update(render_mission(status))
     layout["row2"]["subagents"].update(render_subagents(status))
     layout["row2"]["blackboard"].update(render_blackboard(status))
     layout["row3"]["memory"].update(render_memory(status))
     layout["row3"]["metacog"].update(render_metacognition(status))
     layout["row3"]["skills"].update(render_skills(status))
+    layout["row_cog"].update(render_cognitive(status))
     layout["row4"].update(render_logs(status))
 
     return layout
@@ -443,6 +687,23 @@ def fetch_status(
             except Exception:
                 pass
 
+            # Métacognition (dernière décision : confidence/doute/Brier).
+            try:
+                r = client.get(f"{api_url}/api/metacognition/status")
+                if r.status_code == 200:
+                    status["metacognition"] = r.json()
+            except Exception:
+                pass
+
+            # État cognitif complet (planning, predictive coding,
+            # inhibition, délibération/réflexion on/off) via /api/config/v4.
+            try:
+                r = client.get(f"{api_url}/api/config/v4")
+                if r.status_code == 200:
+                    status["cognitive"] = r.json()
+            except Exception:
+                pass
+
     except Exception as exc:
         status["error"] = str(exc)
 
@@ -539,13 +800,32 @@ def get_mock_status() -> dict[str, Any]:
                 "critic": {"model_id": "Qwen/Qwen2.5-3B-Instruct", "loaded": True},
             },
         },
+        "vram_free_gb": 11.2,
+        "vram_total_gb": 24.0,
+        "model_loaded": True,
+        "model_id": "Qwen/Qwen2.5-7B-Instruct",
+        "boot_components": {"model": "ok", "memory": "ok", "mcp": "ok", "trinity": "ok"},
         "current_mission": {
-            "task": "Débugge la fonction fibonacci",
-            "phase": "execution",
-            "model": "Worker (Qwen2.5-7B-Instruct)",
-            "elapsed_sec": 12.3,
-            "tokens": 234,
+            "name": "Débogage Fibonacci",
+            "task": "Débugge la fonction fibonacci et écris les tests pytest",
+            "elapsed_sec": 42.3,
+            "done": False,
         },
+        "recent_events": [
+            {"t": 2.1, "type": "run_start"},
+            {"t": 3.4, "type": "plan", "hint": "3 étapes"},
+            {"t": 5.0, "type": "tool_call", "tool": "write_file", "hint": "fibonacci.py"},
+            {"t": 6.2, "type": "tool_result", "tool": "write_file", "ok": True, "hint": '{"size": 210}'},
+            {"t": 8.1, "type": "tool_call", "tool": "write_file", "hint": "test_fibonacci.py"},
+            {"t": 9.0, "type": "tool_result", "tool": "write_file", "ok": True, "hint": '{"size": 180}'},
+            {"t": 11.5, "type": "tool_call", "tool": "run_tests", "hint": ""},
+            {"t": 14.2, "type": "tool_result", "tool": "run_tests", "ok": False, "hint": "1 failed: import"},
+            {"t": 16.0, "type": "agent_warning", "hint": "correction de l'import manquant"},
+            {"t": 18.3, "type": "tool_call", "tool": "edit_file", "hint": "fibonacci.py"},
+            {"t": 20.1, "type": "tool_result", "tool": "run_tests", "ok": True, "hint": "3 passed"},
+            {"t": 22.0, "type": "synthesis", "hint": "synthèse produite"},
+            {"t": 23.1, "type": "lesson_learned", "hint": "Débugger une fonction récursive Python"},
+        ],
         "subagents": [
             {"section": "debug_agent", "status": "RUN", "model": "Qwen2.5-7B-Instruct"},
             {"section": "test_agent", "status": "DONE", "model": "Qwen2.5-7B-Instruct"},
@@ -554,12 +834,12 @@ def get_mock_status() -> dict[str, Any]:
         "blackboard": {
             "contract": "Débugge fibonacci et écris les tests",
             "sections": {
-                "debug_agent": {"wins": ["Résultat: fix appliqué"], "fails": [], "notes": ["subagent running"], "status": "running"},
-                "test_agent": {"wins": ["Résultat: tests pass"], "fails": [{"what": "test 1", "why": "import manquant"}], "notes": ["3 tests passent"], "status": "done"},
+                "debug_agent": {"wins": ["fix appliqué", "import corrigé"], "fails": [], "notes": ["running"], "status": "running"},
+                "test_agent": {"wins": ["tests pass"], "fails": [{"what": "test 1", "why": "import"}], "notes": ["3 tests"], "status": "done"},
             },
         },
         "memory": {
-            "sdm_count": 234,
+            "sdm_count": 0,
             "mhn_count": 89,
             "kg_entities": 45,
             "chroma_count": 1024,
@@ -567,10 +847,19 @@ def get_mock_status() -> dict[str, Any]:
             "failures_count": 3,
         },
         "metacognition": {
+            "available": True,
             "confidence_label": "certaine",
             "doubt_index": 0.18,
             "calibration_score": 0.21,
             "recommend_web": False,
+        },
+        "cognitive": {
+            "planning": {"enabled": True, "active_goal": {
+                "description": "Débugger et tester fibonacci", "current_step": 2, "n_steps": 4}},
+            "predictive_coding": {"enabled": True, "last_decision": {"error": 0.34}},
+            "inhibition": {"enabled": True, "stats": {"blocked": 2, "reformulated": 1}},
+            "deliberation": {"enabled": True},
+            "metacognition": {"enabled": True},
         },
         "skills": [
             {"id": "skill_abc", "trigger": "Calculer fibonacci", "success_count": 3, "confidence": 0.85},
@@ -612,9 +901,10 @@ def run_dashboard(
     """
     print("\n  Démarrage du dashboard Rune...\n", file=sys.stderr)
     time.sleep(0.3)
+    _started = time.time()
 
     with Live(
-        build_layout(get_mock_status() if mock else {"error": "connecting"}),
+        build_layout(get_mock_status() if mock else {"error": "connecting"}, _started),
         refresh_per_second=2,
         screen=True,
     ) as live:
@@ -635,7 +925,7 @@ def run_dashboard(
                         "tokens": 0,
                     }
 
-                live.update(build_layout(status))
+                live.update(build_layout(status, _started))
                 time.sleep(refresh_sec)
 
             except KeyboardInterrupt:
@@ -652,7 +942,7 @@ def run_dashboard(
                         "tokens": 0,
                     },
                 }
-                live.update(build_layout(error_status))
+                live.update(build_layout(error_status, _started))
                 time.sleep(refresh_sec)
 
 

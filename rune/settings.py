@@ -162,6 +162,13 @@ class LytheaSettings(BaseSettings):
     # ── Knowledge Graph ────────────────────────────────────────────────
     kg_active_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     kg_capture_sensitive: bool = Field(default=True)
+    # Profil de labels GLiNER pour l'extraction d'entités du KG :
+    #   "chat"  → labels conversationnels (identité, préférences…) [défaut]
+    #   "agent" → labels techniques (fichier, fonction, erreur…)
+    #   "both"  → les deux
+    # L'agent bascule automatiquement sur "agent" (ou "both") pendant une
+    # mission via ``agent_kg_label_profile`` ci-dessous.
+    kg_label_profile: str = Field(default="chat")
     agent_bestofn: int = Field(default=0, ge=0, le=5)  # 0 = auto (selon le matériel)
     agent_web_on_block: bool = Field(default=True)
     agent_snippets_enabled: bool = Field(default=True)
@@ -175,6 +182,12 @@ class LytheaSettings(BaseSettings):
     agent_kg_recall_enabled: bool = Field(default=False)        # PUSH KG au lancement
     agent_episodic_write_enabled: bool = Field(default=False)   # consolidation épisodique
     agent_kg_write_enabled: bool = Field(default=False)         # consolidation KG
+    # Profil de labels GLiNER appliqué PENDANT une mission d'agent. Permet
+    # d'extraire des entités techniques (fichier, fonction, erreur…) plutôt
+    # que conversationnelles quand l'agent travaille. "agent" ou "both"
+    # recommandés ; "chat" garde le profil conversationnel. Ne s'applique
+    # que si agent_kg_recall_enabled ou agent_kg_write_enabled est actif.
+    agent_kg_label_profile: str = Field(default="agent")
     agent_memory_recall_budget_chars: int = Field(default=1200, ge=200, le=8000)
     # Verrou de génération partagé chat/agent (permet de chatter pendant une
     # mission sans collision). ON par défaut : le chat prend le même verrou que

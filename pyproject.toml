@@ -1,6 +1,6 @@
 [project]
 name = "rune"
-version = "0.1.0"
+version = "0.1.2"
 description = "Rune — agent IA cognitif local, headless, open-weights only. Combine le cycle cognitif biomimétique de Lythea avec les capacités agentiques de Rune (auto-skill, subagents, cron)."
 requires-python = ">=3.10"
 license = {text = "MIT"}

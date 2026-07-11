@@ -138,8 +138,19 @@ class EntityExtractor:
     def __init__(self, model_name: str = GLINER_MODEL) -> None:
         self._model_name = model_name
         self._model = None
-        self._labels = list(GLINER_LABELS)
-        self._label_groups = [list(g) for g in GLINER_LABEL_GROUPS]
+        # Profil de labels : lu depuis les settings (défaut "chat"). Le
+        # profil détermine quels groupes de labels GLiNER sont utilisés —
+        # conversationnels ("chat") ou techniques ("agent"). L'agent peut
+        # basculer à chaud via set_label_profile() pendant une mission.
+        from rune.config import gliner_label_groups
+        try:
+            from rune.settings import get_settings
+            self._profile = get_settings().kg_label_profile or "chat"
+        except Exception:  # noqa: BLE001
+            self._profile = "chat"
+        self._label_groups = [list(g) for g in gliner_label_groups(self._profile)]
+        self._labels = list(dict.fromkeys(
+            lbl for g in self._label_groups for lbl in g))
         self._st_model = None
         self._st_tried = False
 
@@ -153,6 +164,22 @@ class EntityExtractor:
         self._encode_cache: BoundedCache = BoundedCache(
             max_size=cache_size, name="entity_extractor.encode",
         )
+
+    def set_label_profile(self, profile: str) -> None:
+        """Bascule le profil de labels GLiNER à chaud (idempotent).
+
+        Utilisé par l'agent pour passer en profil technique le temps d'une
+        mission, puis revenir. Ne recharge PAS le modèle (GLiNER prend les
+        labels à chaque appel de extract()), donc c'est instantané.
+        """
+        from rune.config import gliner_label_groups
+        p = (profile or "chat").lower()
+        if p == getattr(self, "_profile", None):
+            return
+        self._profile = p
+        self._label_groups = [list(g) for g in gliner_label_groups(p)]
+        self._labels = list(dict.fromkeys(
+            lbl for g in self._label_groups for lbl in g))
 
     def _ensure_loaded(self) -> None:
         if self._model is not None:

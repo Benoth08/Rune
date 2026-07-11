@@ -612,6 +612,49 @@ GLINER_LABELS = list(dict.fromkeys(
     lbl for group in GLINER_LABEL_GROUPS for lbl in group
 ))
 
+# ── GLiNER — profil AGENT (technique) ──────────────────────────────────
+# Les labels ci-dessus sont pensés pour un compagnon conversationnel
+# (identité, préférences, relations…). Pour une mission d'agent qui code
+# et exécute, ce sont les entités TECHNIQUES qui comptent. Ces groupes
+# sont utilisés quand ``kg_label_profile`` vaut "agent" (ou fusionnés en
+# "both"). On garde des groupes ≤~12 labels pour un multi-pass efficace.
+GLINER_LABEL_GROUPS_AGENT = [
+    # 1 · Code
+    ["file", "function", "class", "module", "method", "variable",
+     "data_structure", "algorithm"],
+    # 2 · Erreurs & exécution
+    ["error", "exception", "command", "test", "log_message",
+     "stack_trace", "warning"],
+    # 3 · Dépendances & plateforme
+    ["dependency", "library", "framework", "language", "package",
+     "version", "runtime"],
+    # 4 · Systèmes & interfaces
+    ["endpoint", "api", "database", "service", "config_key",
+     "environment_variable", "port", "protocol"],
+    # 5 · Projet
+    ["repository", "branch", "directory", "artifact", "pipeline"],
+]
+GLINER_LABELS_AGENT = list(dict.fromkeys(
+    lbl for group in GLINER_LABEL_GROUPS_AGENT for lbl in group
+))
+
+
+def gliner_label_groups(profile: str = "chat") -> list[list[str]]:
+    """Retourne les groupes de labels GLiNER selon le profil.
+
+    - ``chat``  : labels conversationnels (identité, préférences…) — défaut.
+    - ``agent`` : labels techniques (fichier, fonction, erreur…).
+    - ``both``  : les deux, concaténés (chat d'abord).
+
+    Profil inconnu → ``chat`` (repli sûr).
+    """
+    p = (profile or "chat").lower()
+    if p == "agent":
+        return list(GLINER_LABEL_GROUPS_AGENT)
+    if p == "both":
+        return list(GLINER_LABEL_GROUPS) + list(GLINER_LABEL_GROUPS_AGENT)
+    return list(GLINER_LABEL_GROUPS)
+
 # Safety-relevant types: bypass the active threshold (never stranded in
 # `pending`) and surfaced unconditionally as the vital-constraints block.
 CRITICAL_ENTITY_TYPES = frozenset({

@@ -1084,8 +1084,32 @@ async def agent_status(request: Request) -> dict:
     }
 
 
-@router.get("/api/cache/stats")
-async def cache_stats(request: Request) -> dict:
+@router.get("/api/metacognition/status")
+async def metacognition_status(request: Request) -> dict:
+    """Dernière décision métacognitive (confidence, doute, calibration).
+
+    Lit ``_last_meta_decision`` de l'Hippocampe — mis à jour à chaque
+    échange du chat. Sert le panneau Métacognition du dashboard. Renvoie
+    ``available: false`` tant qu'aucun échange n'a produit de décision.
+    """
+    app = _lythea(request)
+    hippo = getattr(app, "hippocampe", None)
+    dec = getattr(hippo, "_last_meta_decision", None) if hippo else None
+    if dec is None:
+        return {"available": False}
+    try:
+        d = dec.to_dict()
+        return {
+            "available": True,
+            "confidence_label": d.get("confidence_label", "?"),
+            "confidence_score": d.get("confidence_score", 0.0),
+            "doubt_index": d.get("doubt_index", d.get("confidence_score", 0.0)),
+            "calibration_score": d.get("calibration_score", 0.0),
+            "n_calibration_entries": d.get("n_calibration_entries", 0),
+            "recommend_web": bool(d.get("recommend_web", False)),
+        }
+    except Exception:  # noqa: BLE001
+        return {"available": False}
     """Expose embedding cache stats — useful for tuning cache sizes.
 
     Returns hit/miss counters for each cache (entity_extractor.encode,

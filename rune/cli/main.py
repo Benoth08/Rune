@@ -457,6 +457,23 @@ def demo_dashboard():
     run_dashboard(mock=True)
 
 
+@app.command("dashboard-cc")
+def dashboard_cc(
+    api: str = typer.Option("http://localhost:7860", "--api", help="URL API Rune"),
+    refresh: float = typer.Option(0.5, "--refresh", help="Intervalle refresh (s)"),
+):
+    """Dashboard live — thème « Claude Code » (orange, puces ⏺, todos)."""
+    from rune.cli.dashboard_cc import run_cc_dashboard
+    run_cc_dashboard(api_url=api, refresh_sec=refresh, mock=False)
+
+
+@app.command("demo-dashboard-cc")
+def demo_dashboard_cc():
+    """Dashboard thème Claude Code avec données mockées (sans serveur)."""
+    from rune.cli.dashboard_cc import run_cc_dashboard
+    run_cc_dashboard(mock=True)
+
+
 # ── Skills ────────────────────────────────────────────────────────────
 
 
